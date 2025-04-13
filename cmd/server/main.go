@@ -11,7 +11,7 @@ import (
 
 func main() {
 
-	db, err := sql.Open("sqlite", ":memory:")
+	db, err := sql.Open("sqlite", "frogfoot.db")
 	if err != nil {
 		log.Fatal(err)
 	}

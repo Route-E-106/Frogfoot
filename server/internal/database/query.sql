@@ -2,8 +2,12 @@
 SELECT * FROM users
 WHERE id = ? LIMIT 1;
 
--- name: ListUsers :many
+-- name: GetUserByUserName :one
 SELECT * FROM users
+WHERE userName = ? LIMIT 1;
+
+-- name: ListUsers :many
+SELECT id, userName, created_at FROM users
 ORDER BY userName;
 
 -- name: CreateUser :one
