@@ -4,6 +4,12 @@
 
 package models
 
+type Session struct {
+	Token  interface{} `json:"token"`
+	Data   []byte      `json:"data"`
+	Expiry interface{} `json:"expiry"`
+}
+
 type User struct {
 	ID        int64  `json:"id"`
 	Username  string `json:"username"`
