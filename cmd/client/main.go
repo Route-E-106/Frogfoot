@@ -4,6 +4,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,38 +20,53 @@ type userCreds struct {
 	Password string `json:"password"`
 }
 
-type model struct {
-	username   textinput.Model
-	password   textinput.Model
-	focus      int
-	state      appState
-	spinner    spinner.Model
-	creds      userCreds
-	statusMsg  string
-	errMsg     string
-	err        error
-}
-
 type appState int
 
 const (
-	stateLogin appState = iota
+	stateMenu appState = iota
+	stateLogin
+	stateRegister
 	stateLoading
 	stateDone
 	stateError
 )
 
+type model struct {
+	username     textinput.Model
+	password     textinput.Model
+	focus        int
+	state        appState
+	spinner      spinner.Model
+	creds        userCreds
+	statusMsg    string
+	errMsg       string
+	menuIndex    int
+	usernameErr  error
+	passwordErr  error
+}
+
 type sendCredsMsg struct{}
 type invalidCredsMsg struct{}
 
+func validateUsername(username string) error {
+	if len(username) < 4 {
+		return errors.New("Username must be at least 4 characters")
+	}
+	return nil
+}
+
+func validatePassword(password string) error {
+	if len(password) < 4 {
+		return errors.New("Password must be at least 4 characters")
+	}
+	return nil
+}
+
 func sendCreds(creds userCreds) tea.Cmd {
 	return tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-		// Simulate invalid login
 		if creds.Password == "fail" {
 			return invalidCredsMsg{}
 		}
-
-		// Simulate HTTP POST (replace with real API if needed)
 		jsonData, _ := json.Marshal(creds)
 		resp, err := http.Post("https://httpbin.org/post", "application/json", bytes.NewBuffer(jsonData))
 		if err != nil || resp.StatusCode != 200 {
@@ -63,7 +79,6 @@ func sendCreds(creds userCreds) tea.Cmd {
 func initialModel() model {
 	u := textinput.New()
 	u.Placeholder = "Username"
-	u.Focus()
 	u.CharLimit = 64
 	u.Width = 20
 
@@ -80,8 +95,7 @@ func initialModel() model {
 	return model{
 		username: u,
 		password: p,
-		focus:    0,
-		state:    stateLogin,
+		state:    stateMenu,
 		spinner:  s,
 	}
 }
@@ -91,23 +105,26 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    if key, ok := msg.(tea.KeyMsg); ok && key.Type == tea.KeyCtrlC {
+		return m, tea.Quit
+	}
 	switch m.state {
+	case stateMenu:
+		return m.updateMenu(msg)
 	case stateLogin:
 		return m.updateLogin(msg)
+	case stateRegister:
+		return m.updateRegister(msg)
 	case stateLoading:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
-		switch msg := msg.(type) {
-		case sendCredsMsg:
-			m.state = stateDone
-			m.statusMsg = "✅ Login successful!"
-		case invalidCredsMsg:
-			m.state = stateError
-			m.errMsg = "❌ Invalid credentials. Try again."
-		case tea.KeyMsg:
-			if msg.String() == "ctrl+c" || msg.String() == "q" {
-				return m, tea.Quit
-			}
+		switch msg.(type) {
+            case sendCredsMsg:
+                m.state = stateDone
+                m.statusMsg = "✅ Login successful!"
+            case invalidCredsMsg:
+                m.state = stateError
+                m.errMsg = "❌ Invalid credentials. Try again."
 		}
 		return m, cmd
 	case stateDone:
@@ -115,17 +132,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case stateError:
-		if key, ok := msg.(tea.KeyMsg); ok {
-			if key.String() == "enter" {
-				// Reset to login state
-				m.username.SetValue("")
-				m.password.SetValue("")
-				m.username.Focus()
-				m.password.Blur()
-				m.focus = 0
-				m.state = stateLogin
-				m.errMsg = ""
+		if key, ok := msg.(tea.KeyMsg); ok && key.String() == "enter" {
+			m.username.SetValue("")
+			m.password.SetValue("")
+			m.usernameErr = nil
+			m.passwordErr = nil
+			m.username.Focus()
+			m.password.Blur()
+			m.focus = 0
+			m.state = stateLogin
+		}
+	}
+	return m, nil
+}
+
+func (m model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up":
+			if m.menuIndex > 0 {
+				m.menuIndex--
 			}
+		case "down":
+			if m.menuIndex < 1 {
+				m.menuIndex++
+			}
+		case "enter":
+			m.username.SetValue("")
+			m.password.SetValue("")
+			m.usernameErr = nil
+			m.passwordErr = nil
+			m.username.Focus()
+			m.focus = 0
+			if m.menuIndex == 0 {
+				m.state = stateLogin
+			} else {
+				m.state = stateRegister
+			}
+		case "ctrl+c", "q":
+			return m, tea.Quit
 		}
 	}
 	return m, nil
@@ -135,21 +181,25 @@ func (m model) updateLogin(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
-			return m, tea.Quit
-		case "tab", "shift+tab", "enter", "up", "down":
+		case "esc":
+			m.state = stateMenu
+			m.username.SetValue("")
+			m.password.SetValue("")
+			m.usernameErr = nil
+			m.passwordErr = nil
+			return m, nil
+		case "tab", "shift+tab", "up", "down", "enter":
 			if msg.String() == "enter" && m.focus == 1 {
-				username := m.username.Value()
-				password := m.password.Value()
-
-				if len(username) < 4 || len(password) < 4 {
-					m.errMsg = "Username and password must be at least 4 characters."
+				m.usernameErr = validateUsername(m.username.Value())
+				m.passwordErr = validatePassword(m.password.Value())
+				if m.usernameErr != nil || m.passwordErr != nil {
 					return m, nil
 				}
-
-				m.creds = userCreds{Username: username, Password: password}
+				m.creds = userCreds{
+					Username: m.username.Value(),
+					Password: m.password.Value(),
+				}
 				m.state = stateLoading
-				m.errMsg = ""
 				return m, tea.Batch(m.spinner.Tick, sendCreds(m.creds))
 			}
 			m.focus = (m.focus + 1) % 2
@@ -167,26 +217,56 @@ func (m model) updateLogin(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if m.focus == 0 {
 		m.username, cmd = m.username.Update(msg)
+		m.usernameErr = validateUsername(m.username.Value())
 	} else {
 		m.password, cmd = m.password.Update(msg)
+		m.passwordErr = validatePassword(m.password.Value())
 	}
 	return m, cmd
 }
 
+func (m model) updateRegister(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "esc" {
+			m.state = stateMenu
+			m.username.SetValue("")
+			m.password.SetValue("")
+			m.usernameErr = nil
+			m.passwordErr = nil
+		}
+	}
+	return m, nil
+}
+
 func (m model) View() string {
 	switch m.state {
-	case stateLogin:
-		msg := fmt.Sprintf(
-			"Please log in:\n\nUsername: %s\nPassword: %s\n\n(Press Tab to switch, Enter to submit)",
-			m.username.View(),
-			m.password.View(),
-		)
-		if m.errMsg != "" {
-			msg += fmt.Sprintf("\n\n[Error] %s", m.errMsg)
+	case stateMenu:
+		cursor := func(i int) string {
+			if m.menuIndex == i {
+				return "➜ "
+			}
+			return "  "
 		}
-		return msg
+		return fmt.Sprintf(
+			"\nWelcome! Choose an option:\n\n%sLogin\n%sRegister\n\n(Use ↑/↓ and Enter)",
+			cursor(0), cursor(1),
+		)
+	case stateLogin:
+		out := fmt.Sprintf("Login:\n\nUsername: %s\n", m.username.View())
+		if m.usernameErr != nil {
+			out += fmt.Sprintf("   [!] %s\n", m.usernameErr.Error())
+		}
+		out += fmt.Sprintf("Password: %s\n", m.password.View())
+		if m.passwordErr != nil {
+			out += fmt.Sprintf("   [!] %s\n", m.passwordErr.Error())
+		}
+		out += "\n\n(Tab to switch fields, Enter to submit, Esc to go back)"
+		return out
+	case stateRegister:
+		return "\n🛠️  Registration screen (coming soon!)\n\n(Press Esc to go back)"
 	case stateLoading:
-		return fmt.Sprintf("\nSending credentials... %s\n(Press q to cancel)", m.spinner.View())
+		return fmt.Sprintf("\nSending credentials... %s\n", m.spinner.View())
 	case stateDone:
 		return fmt.Sprintf("\n%s\n\n(Press q to quit)", m.statusMsg)
 	case stateError:
