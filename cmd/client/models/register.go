@@ -15,29 +15,55 @@ func NewRegister() Register {
 	return Register{Form: NewForm()}
 }
 
-func (r *Register) Update(msg tea.Msg) (Register, tea.Cmd) {
+func (m *Register) Update(msg tea.Msg) (Register, tea.Cmd) {
 	var cmd tea.Cmd
 
-	if r.Focus == 0 {
-		r.Username, cmd = r.Username.Update(msg)
-		r.UsernameErr = utils.ValidateUsername(r.Username.Value())
-	} else {
-		r.Password, cmd = r.Password.Update(msg)
-		r.PasswordErr = utils.ValidatePassword(r.Password.Value())
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "tab", "enter", "down":
+			m.Focus = (m.Focus + 1) % 2
+		case "up":
+			m.Focus = (m.Focus - 1 + 2) % 2
+		case "esc":
+            m.reset()
+            return *m, tea.Batch(utils.BackToMenuCmd())
+		}
 	}
 
-	return *r, cmd
+	// Update field focus
+	if m.Focus == 0 {
+		m.Username.Focus()
+		m.Password.Blur()
+
+        m.Username, cmd = m.Username.Update(msg)
+        m.UsernameErr = utils.ValidateUsername(m.Username.Value())
+	} else {
+		m.Username.Blur()
+		m.Password.Focus()
+
+        m.Password, cmd = m.Password.Update(msg)
+        m.PasswordErr = utils.ValidatePassword(m.Password.Value())
+	}
+
+	return *m, cmd
 }
 
 func (m Register) View() string {
-	out := fmt.Sprintf("Register:\n\nUsername: %s\n", m.Username.View())
+	s := "Register\n\n"
+	s += "Username: " + m.Username.View() + "\n"
 	if m.UsernameErr != nil {
-		out += fmt.Sprintf("   [!] %s\n", m.UsernameErr.Error())
+		s += fmt.Sprintf("   [!] %s\n", m.UsernameErr.Error())
 	}
-	out += fmt.Sprintf("Password: %s\n", m.Password.View())
+	s += "Password: " + m.Password.View() + "\n"
 	if m.PasswordErr != nil {
-		out += fmt.Sprintf("   [!] %s\n", m.PasswordErr.Error())
+		s += fmt.Sprintf("   [!] %s\n", m.PasswordErr.Error())
 	}
-	out += "\n\n(Tab to switch, Enter to submit, Esc to go back)"
-	return out
+	s += "\n[Tab/↑↓/Enter] Switch  •  [Esc] Back"
+	return s
+}
+
+func (l Register) reset() Register {
+	form := NewRegister()
+	return form
 }

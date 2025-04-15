@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -12,9 +13,6 @@ const (
 	StateMenu AppState = iota
 	StateLogin
 	StateRegister
-	StateLoading
-	StateDone
-	StateError
 )
 
 type AppModel struct {
@@ -43,6 +41,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	if _, ok := msg.(utils.BackToMenuMsg); ok {
+		m.State = StateMenu
+		m.Login = NewLogin() 
+		m.Register = NewRegister()
+		return m, nil
+	}
+
 	switch m.State {
 	case StateMenu:
 		return m.updateMenu(msg)
@@ -55,6 +60,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Register = register
 		return m, cmd
 	}
+
 	return m, nil
 }
 
