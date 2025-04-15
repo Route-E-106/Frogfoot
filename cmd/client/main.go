@@ -27,6 +27,7 @@ type model struct {
 	spinner    spinner.Model
 	creds      userCreds
 	statusMsg  string
+	errMsg     string
 	err        error
 }
 
@@ -36,20 +37,24 @@ const (
 	stateLogin appState = iota
 	stateLoading
 	stateDone
+	stateError
 )
 
-// Simulate sending credentials over HTTP
 type sendCredsMsg struct{}
+type invalidCredsMsg struct{}
 
 func sendCreds(creds userCreds) tea.Cmd {
 	return tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-		// Simulated POST request
-		jsonData, _ := json.Marshal(creds)
+		// Simulate invalid login
+		if creds.Password == "fail" {
+			return invalidCredsMsg{}
+		}
 
-		// Replace with your actual URL if needed
+		// Simulate HTTP POST (replace with real API if needed)
+		jsonData, _ := json.Marshal(creds)
 		resp, err := http.Post("https://httpbin.org/post", "application/json", bytes.NewBuffer(jsonData))
 		if err != nil || resp.StatusCode != 200 {
-			return tea.Quit
+			return invalidCredsMsg{}
 		}
 		return sendCredsMsg{}
 	})
@@ -95,7 +100,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case sendCredsMsg:
 			m.state = stateDone
-			m.statusMsg = "Login successful!"
+			m.statusMsg = "✅ Login successful!"
+		case invalidCredsMsg:
+			m.state = stateError
+			m.errMsg = "❌ Invalid credentials. Try again."
 		case tea.KeyMsg:
 			if msg.String() == "ctrl+c" || msg.String() == "q" {
 				return m, tea.Quit
@@ -105,6 +113,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case stateDone:
 		if key, ok := msg.(tea.KeyMsg); ok && (key.String() == "q" || key.String() == "ctrl+c") {
 			return m, tea.Quit
+		}
+	case stateError:
+		if key, ok := msg.(tea.KeyMsg); ok {
+			if key.String() == "enter" {
+				// Reset to login state
+				m.username.SetValue("")
+				m.password.SetValue("")
+				m.username.Focus()
+				m.password.Blur()
+				m.focus = 0
+				m.state = stateLogin
+				m.errMsg = ""
+			}
 		}
 	}
 	return m, nil
@@ -118,17 +139,20 @@ func (m model) updateLogin(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "tab", "shift+tab", "enter", "up", "down":
 			if msg.String() == "enter" && m.focus == 1 {
-				m.creds = userCreds{
-					Username: m.username.Value(),
-					Password: m.password.Value(),
+				username := m.username.Value()
+				password := m.password.Value()
+
+				if len(username) < 4 || len(password) < 4 {
+					m.errMsg = "Username and password must be at least 4 characters."
+					return m, nil
 				}
+
+				m.creds = userCreds{Username: username, Password: password}
 				m.state = stateLoading
+				m.errMsg = ""
 				return m, tea.Batch(m.spinner.Tick, sendCreds(m.creds))
 			}
-			m.focus++
-			if m.focus > 1 {
-				m.focus = 0
-			}
+			m.focus = (m.focus + 1) % 2
 			if m.focus == 0 {
 				m.username.Focus()
 				m.password.Blur()
@@ -152,15 +176,21 @@ func (m model) updateLogin(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	switch m.state {
 	case stateLogin:
-		return fmt.Sprintf(
+		msg := fmt.Sprintf(
 			"Please log in:\n\nUsername: %s\nPassword: %s\n\n(Press Tab to switch, Enter to submit)",
 			m.username.View(),
 			m.password.View(),
 		)
+		if m.errMsg != "" {
+			msg += fmt.Sprintf("\n\n[Error] %s", m.errMsg)
+		}
+		return msg
 	case stateLoading:
 		return fmt.Sprintf("\nSending credentials... %s\n(Press q to cancel)", m.spinner.View())
 	case stateDone:
-		return fmt.Sprintf("\n✅ %s\n\n(Press q to quit)", m.statusMsg)
+		return fmt.Sprintf("\n%s\n\n(Press q to quit)", m.statusMsg)
+	case stateError:
+		return fmt.Sprintf("\n[Error] %s\n\n(Press Enter to try again)", m.errMsg)
 	}
 	return ""
 }
