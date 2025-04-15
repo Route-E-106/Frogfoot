@@ -21,6 +21,11 @@ const (
 	StateError
 )
 
+type loginResultMsg struct {
+    success bool
+    err     error
+}
+
 type Login struct {
 	Form
     spinner spinner.Model
@@ -41,6 +46,16 @@ func (m *Login) Update(msg tea.Msg) (Login, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.State {
 	case StateRequest:
+        switch msg := msg.(type) {
+        case loginResultMsg:
+            if msg.success {
+                m.State = StateSucceeded
+            } else {
+                m.State = StateError
+            }
+            return *m, nil
+        }
+
         m.spinner, cmd = m.spinner.Update(msg)
         return *m, tea.Batch(m.spinner.Tick, cmd) 
 	case StateSucceeded:
@@ -65,8 +80,17 @@ func (m *Login) Update(msg tea.Msg) (Login, tea.Cmd) {
 		case "tab", "down":
 			m.Focus = (m.Focus + 1) % 2
         case "enter":
-            m.State = StateRequest
-            return *m, tea.Batch(m.spinner.Tick, attemptLogin(m))
+            if m.Focus == 0 {
+                m.Focus = (m.Focus + 1) % 2
+            } else {
+                m.UsernameErr = utils.ValidateUsername(m.Username.Value())
+                m.PasswordErr = utils.ValidatePassword(m.Password.Value())
+
+                if m.UsernameErr == nil && m.PasswordErr == nil {
+                    m.State = StateRequest
+                    return *m, tea.Batch(m.spinner.Tick, attemptLogin(m))
+                }
+            }
 		case "up":
 			m.Focus = (m.Focus - 1 + 2) % 2
 		case "esc":
@@ -118,19 +142,19 @@ func (m Login) View() string {
 }
 
 func attemptLogin(m *Login) tea.Cmd {
-	return func() tea.Msg {
-		_, err := simulateLogin(m.Username.Value(), m.Password.Value())
-		if err != nil {
-            m.State = StateError
-		} else {
-            m.State = StateSucceeded
+    username := m.Username.Value()
+    password := m.Password.Value()
+
+    return func() tea.Msg {
+        _, err := simulateLogin(username, password)
+        if err != nil {
+            return loginResultMsg{success: false, err: err}
         }
-		return nil
-	}
+        return loginResultMsg{success: true, err: nil}
+    }
 }
 
 func simulateLogin(username, password string) (string, error) {
-    return "Login successful!", nil
 	payload := map[string]string{
 		"username": username,
 		"password": password,
