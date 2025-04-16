@@ -27,6 +27,6 @@ func main() {
 	err = httpSrv.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
-	}
 
+	}
 }
