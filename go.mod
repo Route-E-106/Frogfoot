@@ -3,6 +3,8 @@ module github.com/Route-E-106/Frogfoot
 go 1.23.3
 
 require (
+	github.com/alexedwards/scs/sqlite3store v0.0.0-20250212122300-421ef1d8611c
+	github.com/alexedwards/scs/v2 v2.8.0
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.4
 	modernc.org/sqlite v1.37.0

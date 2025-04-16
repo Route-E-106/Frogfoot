@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -65,9 +66,9 @@ func (s *Server) handlerRegisterUser() http.Handler {
 		}
 		s.Logger.Info("Created user", "username", user.Username)
 
-		msg := []byte("User created sucessfully")
+		msg := fmt.Sprintf("User %s created sucessfully", user.Username)
 
-		w.Write(msg)
+		w.Write([]byte(msg))
 	}
 	return http.HandlerFunc(fn)
 }
@@ -80,19 +81,28 @@ func (s *Server) handlerLoginUser() http.Handler {
 		err := helpers.DecodeJSONBody(w, r, &rcvUserParams)
 		if err != nil {
 			s.Logger.Error(err.Error())
+			return
 
 		}
 		user, err := s.Queries.GetUserByUserName(s.ctx, rcvUserParams.Username)
 		if err != nil {
 			s.Logger.Error(err.Error())
 			if errors.Is(err, sql.ErrNoRows) {
-				w.Write([]byte("User doesn't exist"))
+				err = errors.New("User doesn't exist")
+				s.Logger.Error(err.Error())
+				helpers.ClientError(w, err, 400)
 				return
 			}
 		}
 		if rcvUserParams.Password == user.Password {
 			s.Logger.Info("Logging user", "username", user.Username)
+			s.sessionManager.Put(r.Context(), "userAuthID", user.ID)
+		} else {
+			s.Logger.Info("User provided wrong password", "provided password", rcvUserParams.Password)
+			err = errors.New("Wrong password")
+			helpers.ClientError(w, err, 401)
 		}
+
 	}
 	return http.HandlerFunc(fn)
 }
