@@ -57,7 +57,7 @@ func (m *Login) Update(msg tea.Msg) (Login, tea.Cmd) {
         }
 
         m.spinner, cmd = m.spinner.Update(msg)
-        return *m, tea.Batch(m.spinner.Tick, cmd) 
+        return *m, cmd 
 	case StateSucceeded:
         switch msg.(type) {
         case tea.KeyMsg:
