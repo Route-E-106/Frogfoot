@@ -22,9 +22,9 @@ func (m *Register) Update(msg tea.Msg) (Register, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "tab", "enter", "down":
-			m.Focus = (m.Focus + 1) % 2
+			m.MenuIndex = (m.MenuIndex + 1) % 2
 		case "up":
-			m.Focus = (m.Focus - 1 + 2) % 2
+			m.MenuIndex = (m.MenuIndex - 1 + 2) % 2
 		case "esc":
             m.reset()
             return *m, tea.Batch(utils.BackToMenuCmd())
@@ -32,7 +32,7 @@ func (m *Register) Update(msg tea.Msg) (Register, tea.Cmd) {
 	}
 
 	// Update field focus
-	if m.Focus == 0 {
+	if m.MenuIndex == 0 {
 		m.Username.Focus()
 		m.Password.Blur()
 
