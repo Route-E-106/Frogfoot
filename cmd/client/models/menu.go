@@ -53,7 +53,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateMenu(msg)
 	case StateLogin:
 		login, cmd := m.Login.Update(msg)
-		m.Login = login
+		m.Login = *login
 		return m, cmd
 	case StateRegister:
 		register, cmd := m.Register.Update(msg)

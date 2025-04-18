@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+    "net/http/cookiejar"
 	"time"
 	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
     "github.com/charmbracelet/bubbles/spinner"
@@ -34,19 +35,26 @@ type Login struct {
     spinner spinner.Model
     State LoginState
     userMenuModel UserMenuModel 
+    jar *cookiejar.Jar
 }
 
 func NewLogin() Login {
     s := spinner.New()
 	s.Spinner = spinner.Dot
 
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		panic(err)
+	}
+
 	return Login{
         Form: NewForm(),
         spinner: s,
+        jar: jar,
     }
 }
 
-func (m Login) Update(msg tea.Msg) (Login, tea.Cmd) {
+func (m *Login) Update(msg tea.Msg) (*Login, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.State {
 	case StateRequest:
@@ -155,12 +163,12 @@ func (m Login) View() string {
 	return s
 }
 
-func attemptLogin(m Login) tea.Cmd {
+func attemptLogin(m *Login) tea.Cmd {
     username := m.Username.Value()
     password := m.Password.Value()
 
     return func() tea.Msg {
-        token, err := simulateLogin(username, password, true)
+        token, err := simulateLogin(m, username, password)
         if err != nil {
             return loginResultMsg{success: false, err: err}
         }
@@ -168,15 +176,7 @@ func attemptLogin(m Login) tea.Cmd {
     }
 }
 
-func simulateLogin(username, password string, overrideHttpRequest bool) (string, error) {
-    if (overrideHttpRequest) {
-
-        if password == "fail" {
-            return "", fmt.Errorf("invalid password")
-        }
-
-        return "Override", nil
-    }
+func simulateLogin(m *Login, username, password string) (string, error) {
 
 	payload := map[string]string{
 		"username": username,
@@ -189,9 +189,9 @@ func simulateLogin(username, password string, overrideHttpRequest bool) (string,
 		return "", fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	url := "https://httpbin.org/post"
+    url := "http://localhost:8080/users/login"
 
-	client := &http.Client{Timeout: 10 * time.Second}
+    client := &http.Client{Timeout: 10 * time.Second, Jar: m.jar}
 
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
 
@@ -201,17 +201,14 @@ func simulateLogin(username, password string, overrideHttpRequest bool) (string,
 
 	defer resp.Body.Close()
 
-	if password == "fail" {
-		return "", fmt.Errorf("invalid password")
-	}
-
 	if resp.StatusCode == 200 {
 		return "custom_token", nil
 	}
+
 	return "", fmt.Errorf("unexpected error: %s", resp.Status)
 }
 
-func (l Login) reset() Login {
+func (l *Login) reset() Login {
 	form := NewLogin()
 	return form
 }
