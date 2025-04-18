@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/alexedwards/scs/v2"
 )
 
 func ClientError(w http.ResponseWriter, err error, status int) {
@@ -83,4 +85,8 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}) err
 	}
 
 	return nil
+}
+
+func IsAuthenticated(s *scs.SessionManager, r *http.Request) bool {
+	return s.Exists(r.Context(), "userAuthID")
 }
