@@ -11,7 +11,7 @@ import (
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
-  userName, password, created_at
+  username, password, created_at
 ) VALUES (
   ?, ?, ?
 )
@@ -55,7 +55,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 
 const getUserByUserName = `-- name: GetUserByUserName :one
 SELECT id, username, password, created_at FROM users
-WHERE userName = ? LIMIT 1
+WHERE username = ? LIMIT 1
 `
 
 func (q *Queries) GetUserByUserName(ctx context.Context, username string) (User, error) {
@@ -71,8 +71,8 @@ func (q *Queries) GetUserByUserName(ctx context.Context, username string) (User,
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, userName, created_at FROM users
-ORDER BY userName
+SELECT id, username, created_at FROM users
+ORDER BY username
 `
 
 type ListUsersRow struct {
@@ -102,4 +102,63 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const returnIncomeHistory = `-- name: ReturnIncomeHistory :many
+SELECT resource_name, income, change_timestamp FROM income_history
+WHERE user_id = ?
+`
+
+type ReturnIncomeHistoryRow struct {
+	ResourceName    string `json:"resource_name"`
+	Income          int64  `json:"income"`
+	ChangeTimestamp int64  `json:"change_timestamp"`
+}
+
+func (q *Queries) ReturnIncomeHistory(ctx context.Context, userID int64) ([]ReturnIncomeHistoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, returnIncomeHistory, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReturnIncomeHistoryRow
+	for rows.Next() {
+		var i ReturnIncomeHistoryRow
+		if err := rows.Scan(&i.ResourceName, &i.Income, &i.ChangeTimestamp); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateIncomeHistory = `-- name: UpdateIncomeHistory :exec
+INSERT INTO income_history(
+    resource_name, income, user_id, change_timestamp
+) VALUES (
+?, ?, ?, ?
+)
+`
+
+type UpdateIncomeHistoryParams struct {
+	ResourceName    string `json:"resource_name"`
+	Income          int64  `json:"income"`
+	UserID          int64  `json:"user_id"`
+	ChangeTimestamp int64  `json:"change_timestamp"`
+}
+
+func (q *Queries) UpdateIncomeHistory(ctx context.Context, arg UpdateIncomeHistoryParams) error {
+	_, err := q.db.ExecContext(ctx, updateIncomeHistory,
+		arg.ResourceName,
+		arg.Income,
+		arg.UserID,
+		arg.ChangeTimestamp,
+	)
+	return err
 }

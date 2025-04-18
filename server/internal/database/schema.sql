@@ -1,9 +1,19 @@
 CREATE TABLE IF NOT EXISTS users (
     id   INTEGER PRIMARY KEY,
-    userName TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL UNIQUE,
     password  TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS income_history (
+    id INTEGER PRIMARY KEY,
+    resource_name TEXT NOT NULL,
+    income INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    change_timestamp INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
     token char(43) primary key,
     data BLOB NOT NULL,

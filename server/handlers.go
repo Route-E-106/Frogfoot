@@ -15,7 +15,23 @@ import (
 
 func (s *Server) handlerGetResources() http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		s.Logger.Info("Listing users")
+
+		s.Logger.Info("Listing income history")
+		userId := s.sessionManager.GetInt64(r.Context(), "userAuthID")
+
+		incomeHistory, err := s.Queries.ReturnIncomeHistory(s.ctx, userId)
+		if err != nil {
+			s.Logger.Error(err.Error())
+		}
+		data, err := json.Marshal(&incomeHistory)
+		if err != nil {
+			s.Logger.Error(err.Error())
+		}
+		_, err = w.Write(data)
+		if err != nil {
+			s.Logger.Error(err.Error())
+		}
+		s.Logger.Info("Income history", "history", incomeHistory)
 	}
 	return http.HandlerFunc(fn)
 }
@@ -64,6 +80,34 @@ func (s *Server) handlerRegisterUser() http.Handler {
 			}
 			return
 		}
+
+		var initialIncome int64 = 1000
+
+		initalGasIncome := models.UpdateIncomeHistoryParams{
+			ResourceName:    "Gas",
+			Income:          initialIncome,
+			UserID:          user.ID,
+			ChangeTimestamp: createdAt,
+		}
+		initalMetalIncome := models.UpdateIncomeHistoryParams{
+			ResourceName:    "Metal",
+			Income:          initialIncome,
+			UserID:          user.ID,
+			ChangeTimestamp: createdAt,
+		}
+		err = s.Queries.UpdateIncomeHistory(s.ctx, initalGasIncome)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			helpers.ClientError(w, err, 400)
+			return
+		}
+		err = s.Queries.UpdateIncomeHistory(s.ctx, initalMetalIncome)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			helpers.ClientError(w, err, 400)
+			return
+		}
+
 		s.Logger.Info("Created user", "username", user.Username)
 
 		msg := fmt.Sprintf("User %s created sucessfully", user.Username)
