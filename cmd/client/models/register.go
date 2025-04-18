@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
-    "github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/spinner"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -23,7 +23,6 @@ const (
 
 type registerResultMsg struct {
     username string
-    token string
     success bool
     err     error
 }
@@ -49,15 +48,9 @@ func (m Register) Update(msg tea.Msg) (Register, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.State {
 	case RegisterStateRequest:
-        switch msg := msg.(type) {
+        switch msg.(type) {
         case registerResultMsg:
-            if msg.success {
-                m.State = RegisterStateSucceeded
-                m.userMenuModel = NewUserMenu(msg.username, msg.token)
-            } else {
-                m.State = RegisterStateError
-            }
-            return m, nil
+            return m, utils.BackToMenuCmd()
         }
 
         m.spinner, cmd = m.spinner.Update(msg)
@@ -152,24 +145,15 @@ func attemptRegister(m Register) tea.Cmd {
     password := m.Password.Value()
 
     return func() tea.Msg {
-        token, err := simulateRegister(username, password, false)
+        err := simulateRegister(username, password)
         if err != nil {
             return registerResultMsg{success: false, err: err}
         }
-        return registerResultMsg{success: true, err: nil, username: username, token: token}
+        return registerResultMsg{success: true, err: nil}
     }
 }
 
-func simulateRegister(username, password string, overrideHttpRequest bool) (string, error) {
-    if (overrideHttpRequest) {
-
-        if password == "fail" {
-            return "", fmt.Errorf("invalid password")
-        }
-
-        return "Override", nil
-    }
-
+func simulateRegister(username, password string) (error) {
 	payload := map[string]string{
 		"username": username,
 		"password": password,
@@ -178,7 +162,7 @@ func simulateRegister(username, password string, overrideHttpRequest bool) (stri
 	payloadBytes, err := json.Marshal(payload)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal payload: %w", err)
+		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
     url := "http://localhost:8080/users/register"
@@ -188,15 +172,15 @@ func simulateRegister(username, password string, overrideHttpRequest bool) (stri
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
 
 	if err != nil {
-		return "", fmt.Errorf("failed to send HTTP request: %w", err)
+		return fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
-		return "custom_token", nil
+		return nil
 	}
-	return "", fmt.Errorf("unexpected error: %s", resp.Status)
+	return fmt.Errorf("unexpected error: %s", resp.Status)
 }
 
 func (l Register) reset() Register{

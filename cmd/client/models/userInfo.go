@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"time"
+    "net/http/cookiejar"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -19,8 +20,8 @@ type UserMenuModel struct {
 	State     UserMenuState
 	MenuIndex int
     username  string
-    token     string
     resources Resources
+    jar *cookiejar.Jar
 }
 
 type IncomeCommand struct {
@@ -40,12 +41,12 @@ type Resources struct {
 
 type tickMsg time.Time
 
-func NewUserMenu(username string, token string) UserMenuModel {
+func NewUserMenu(username string, jar *cookiejar.Jar) UserMenuModel {
     model := UserMenuModel{
         State:     UserMenu,
         MenuIndex: 0,
         username:  username,
-        token:     token,
+        jar: jar,
     }
 
     model.updateResources();
@@ -105,11 +106,11 @@ func (m UserMenuModel) tick() tea.Cmd {
 }
 
 func (m *UserMenuModel) updateResources() {
-    minerals, err := getResourceHistory(m.token); 
+    minerals, err := getResourceHistory(m.jar); 
     if err != nil {
         return; 
     }
-    gas, err := getResourceHistory(m.token); 
+    gas, err := getResourceHistory(m.jar); 
 
     if err != nil {
         return;
@@ -163,7 +164,7 @@ func (history ResourceHistory) CalculateResources() int {
     return int(math.Floor(total)) + history.ChangeAmount
 }
 
-func getResourceHistory(token string) (ResourceHistory, error) {
+func getResourceHistory(jar *cookiejar.Jar) (ResourceHistory, error) {
     commands := []IncomeCommand{
         {Income: 1000, Timestamp: time.Date(2025, time.January, 01, 0, 0, 0, 0, time.UTC)},
         {Income: 2000, Timestamp: time.Date(2025, time.February, 01, 0, 0, 0, 0, time.UTC)},

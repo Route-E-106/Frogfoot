@@ -25,7 +25,7 @@ const (
 
 type loginResultMsg struct {
     username string
-    token string
+    jar *cookiejar.Jar
     success bool
     err     error
 }
@@ -35,22 +35,15 @@ type Login struct {
     spinner spinner.Model
     State LoginState
     userMenuModel UserMenuModel 
-    jar *cookiejar.Jar
 }
 
 func NewLogin() Login {
     s := spinner.New()
 	s.Spinner = spinner.Dot
 
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		panic(err)
-	}
-
 	return Login{
         Form: NewForm(),
         spinner: s,
-        jar: jar,
     }
 }
 
@@ -62,7 +55,7 @@ func (m *Login) Update(msg tea.Msg) (*Login, tea.Cmd) {
         case loginResultMsg:
             if msg.success {
                 m.State = StateSucceeded
-                m.userMenuModel = NewUserMenu(msg.username, msg.token)
+                m.userMenuModel = NewUserMenu(msg.username, msg.jar)
             } else {
                 m.State = StateError
             }
@@ -168,15 +161,15 @@ func attemptLogin(m *Login) tea.Cmd {
     password := m.Password.Value()
 
     return func() tea.Msg {
-        token, err := simulateLogin(m, username, password)
+        jar, err := simulateLogin(m, username, password)
         if err != nil {
             return loginResultMsg{success: false, err: err}
         }
-        return loginResultMsg{success: true, err: nil, username: username, token: token}
+        return loginResultMsg{success: true, err: nil, username: username, jar: jar}
     }
 }
 
-func simulateLogin(m *Login, username, password string) (string, error) {
+func simulateLogin(m *Login, username, password string) (*cookiejar.Jar, error) {
 
 	payload := map[string]string{
 		"username": username,
@@ -186,26 +179,31 @@ func simulateLogin(m *Login, username, password string) (string, error) {
 	payloadBytes, err := json.Marshal(payload)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+    jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
     url := "http://localhost:8080/users/login"
 
-    client := &http.Client{Timeout: 10 * time.Second, Jar: m.jar}
+    client := &http.Client{Timeout: 10 * time.Second, Jar: jar}
 
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
 
 	if err != nil {
-		return "", fmt.Errorf("failed to send HTTP request: %w", err)
+		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
-		return "custom_token", nil
+		return jar, nil
 	}
 
-	return "", fmt.Errorf("unexpected error: %s", resp.Status)
+	return nil, fmt.Errorf("unexpected error: %s", resp.Status)
 }
 
 func (l *Login) reset() Login {
