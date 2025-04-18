@@ -13,6 +13,7 @@ const (
 	StateMenu AppState = iota
 	StateLogin
 	StateRegister
+    StateLoggedIn
 )
 
 type AppModel struct {
@@ -20,7 +21,6 @@ type AppModel struct {
 	MenuIndex int
 	Login     Login
 	Register  Register
-	// ... other state like spinner, errors, etc.
 }
 
 func NewApp() AppModel {

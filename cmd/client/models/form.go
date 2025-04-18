@@ -7,7 +7,7 @@ import (
 type Form struct {
 	Username    textinput.Model
 	Password    textinput.Model
-	Focus       int
+	MenuIndex       int
 	UsernameErr error
 	PasswordErr error
 }
@@ -29,13 +29,13 @@ func NewForm() Form {
 	return Form{
 		Username: u,
 		Password: p,
-		Focus:    0,
+		MenuIndex:    0,
 	}
 }
 
 func (f *Form) SwitchFocus() {
-	f.Focus = (f.Focus + 1) % 2
-	if f.Focus == 0 {
+	f.MenuIndex = (f.MenuIndex + 1) % 2
+	if f.MenuIndex == 0 {
 		f.Username.Focus()
 		f.Password.Blur()
 	} else {
