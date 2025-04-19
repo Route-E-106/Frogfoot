@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Route-E-106/Frogfoot/server/internal/database/models"
+	"github.com/Route-E-106/Frogfoot/server/resources"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 )
@@ -22,6 +23,7 @@ type Server struct {
 	Queries        *models.Queries
 	ctx            context.Context
 	sessionManager *scs.SessionManager
+	resources      resources.Resources
 }
 
 func NewServer(db *sql.DB) *Server {
