@@ -48,9 +48,15 @@ func (m Register) Update(msg tea.Msg) (Register, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.State {
 	case RegisterStateRequest:
-        switch msg.(type) {
+        switch msg := msg.(type) {
         case registerResultMsg:
-            return m, utils.BackToMenuCmd()
+            if msg.success {
+                m.State = RegisterStateSucceeded
+            } else {
+                m.State = RegisterStateError
+            }
+
+            return m, nil
         }
 
         m.spinner, cmd = m.spinner.Update(msg)
@@ -145,7 +151,7 @@ func attemptRegister(m Register) tea.Cmd {
     password := m.Password.Value()
 
     return func() tea.Msg {
-        err := simulateRegister(username, password)
+        err := register(username, password)
         if err != nil {
             return registerResultMsg{success: false, err: err}
         }
@@ -153,7 +159,7 @@ func attemptRegister(m Register) tea.Cmd {
     }
 }
 
-func simulateRegister(username, password string) (error) {
+func register(username, password string) (error) {
 	payload := map[string]string{
 		"username": username,
 		"password": password,

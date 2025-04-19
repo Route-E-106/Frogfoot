@@ -161,7 +161,7 @@ func attemptLogin(m *Login) tea.Cmd {
     password := m.Password.Value()
 
     return func() tea.Msg {
-        jar, err := simulateLogin(m, username, password)
+        jar, err := login(username, password)
         if err != nil {
             return loginResultMsg{success: false, err: err}
         }
@@ -169,7 +169,7 @@ func attemptLogin(m *Login) tea.Cmd {
     }
 }
 
-func simulateLogin(m *Login, username, password string) (*cookiejar.Jar, error) {
+func login(username, password string) (*cookiejar.Jar, error) {
 
 	payload := map[string]string{
 		"username": username,
@@ -184,7 +184,7 @@ func simulateLogin(m *Login, username, password string) (*cookiejar.Jar, error) 
 
     jar, err := cookiejar.New(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, fmt.Errorf("failed to create jar: %w", err)
 	}
 
     url := "http://localhost:8080/users/login"
