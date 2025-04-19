@@ -18,14 +18,24 @@ INSERT INTO users (
 )
 RETURNING *;
 
--- name: ReturnIncomeHistory :many
-SELECT resource_name, income, change_timestamp FROM income_history
+-- name: ReturnGasIncomeHistory :many
+SELECT income, change_timestamp FROM gas_income_history
 WHERE user_id = ?;
 
--- name: UpdateIncomeHistory :exec
-INSERT INTO income_history(
-    resource_name, income, user_id, change_timestamp
-) VALUES (
-?, ?, ?, ?
-)
+-- name: ReturnMetalIncomeHistory :many
+SELECT income, change_timestamp FROM metal_income_history
+WHERE user_id = ?;
 
+-- name: UpdateGasIncomeHistory :exec
+INSERT INTO gas_income_history(
+    income, user_id, change_timestamp
+) VALUES (
+?, ?, ?
+);
+
+-- name: UpdateMetalIncomeHistory :exec
+INSERT INTO metal_income_history(
+    income, user_id, change_timestamp
+) VALUES (
+?, ?, ?
+);

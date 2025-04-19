@@ -5,9 +5,16 @@ CREATE TABLE IF NOT EXISTS users (
     created_at INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS income_history (
+CREATE TABLE IF NOT EXISTS gas_income_history (
     id INTEGER PRIMARY KEY,
-    resource_name TEXT NOT NULL,
+    income INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    change_timestamp INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS metal_income_history (
+    id INTEGER PRIMARY KEY,
     income INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     change_timestamp INTEGER NOT NULL,

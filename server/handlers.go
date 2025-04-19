@@ -16,22 +16,24 @@ import (
 func (s *Server) handlerGetResources() http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
-		s.Logger.Info("Listing income history")
 		userId := s.sessionManager.GetInt64(r.Context(), "userAuthID")
+		err := s.resources.RetriveResourcesHistory(userId, s.Queries, r.Context())
+		if err != nil {
+			s.Logger.Error(err.Error())
+			return
+		}
+		data, err := json.Marshal(s.resources)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			return
+		}
 
-		incomeHistory, err := s.Queries.ReturnIncomeHistory(s.ctx, userId)
-		if err != nil {
-			s.Logger.Error(err.Error())
-		}
-		data, err := json.Marshal(&incomeHistory)
-		if err != nil {
-			s.Logger.Error(err.Error())
-		}
+		s.Logger.Info("Income history", "history", data)
+
 		_, err = w.Write(data)
 		if err != nil {
 			s.Logger.Error(err.Error())
 		}
-		s.Logger.Info("Income history", "history", incomeHistory)
 	}
 	return http.HandlerFunc(fn)
 }
@@ -83,25 +85,23 @@ func (s *Server) handlerRegisterUser() http.Handler {
 
 		var initialIncome int64 = 1000
 
-		initalGasIncome := models.UpdateIncomeHistoryParams{
-			ResourceName:    "Gas",
+		initalGasIncome := models.UpdateGasIncomeHistoryParams{
 			Income:          initialIncome,
 			UserID:          user.ID,
 			ChangeTimestamp: createdAt,
 		}
-		initalMetalIncome := models.UpdateIncomeHistoryParams{
-			ResourceName:    "Metal",
+		initalMetalIncome := models.UpdateMetalIncomeHistoryParams{
 			Income:          initialIncome,
 			UserID:          user.ID,
 			ChangeTimestamp: createdAt,
 		}
-		err = s.Queries.UpdateIncomeHistory(s.ctx, initalGasIncome)
+		err = s.Queries.UpdateGasIncomeHistory(s.ctx, initalGasIncome)
 		if err != nil {
 			s.Logger.Error(err.Error())
 			helpers.ClientError(w, err, 400)
 			return
 		}
-		err = s.Queries.UpdateIncomeHistory(s.ctx, initalMetalIncome)
+		err = s.Queries.UpdateMetalIncomeHistory(s.ctx, initalMetalIncome)
 		if err != nil {
 			s.Logger.Error(err.Error())
 			helpers.ClientError(w, err, 400)

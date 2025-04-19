@@ -4,12 +4,18 @@
 
 package models
 
-type IncomeHistory struct {
-	ID              int64  `json:"id"`
-	ResourceName    string `json:"resource_name"`
-	Income          int64  `json:"income"`
-	UserID          int64  `json:"user_id"`
-	ChangeTimestamp int64  `json:"change_timestamp"`
+type GasIncomeHistory struct {
+	ID              int64 `json:"id"`
+	Income          int64 `json:"income"`
+	UserID          int64 `json:"user_id"`
+	ChangeTimestamp int64 `json:"change_timestamp"`
+}
+
+type MetalIncomeHistory struct {
+	ID              int64 `json:"id"`
+	Income          int64 `json:"income"`
+	UserID          int64 `json:"user_id"`
+	ChangeTimestamp int64 `json:"change_timestamp"`
 }
 
 type Session struct {

@@ -104,27 +104,26 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 	return items, nil
 }
 
-const returnIncomeHistory = `-- name: ReturnIncomeHistory :many
-SELECT resource_name, income, change_timestamp FROM income_history
+const returnGasIncomeHistory = `-- name: ReturnGasIncomeHistory :many
+SELECT income, change_timestamp FROM gas_income_history
 WHERE user_id = ?
 `
 
-type ReturnIncomeHistoryRow struct {
-	ResourceName    string `json:"resource_name"`
-	Income          int64  `json:"income"`
-	ChangeTimestamp int64  `json:"change_timestamp"`
+type ReturnGasIncomeHistoryRow struct {
+	Income          int64 `json:"income"`
+	ChangeTimestamp int64 `json:"change_timestamp"`
 }
 
-func (q *Queries) ReturnIncomeHistory(ctx context.Context, userID int64) ([]ReturnIncomeHistoryRow, error) {
-	rows, err := q.db.QueryContext(ctx, returnIncomeHistory, userID)
+func (q *Queries) ReturnGasIncomeHistory(ctx context.Context, userID int64) ([]ReturnGasIncomeHistoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, returnGasIncomeHistory, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ReturnIncomeHistoryRow
+	var items []ReturnGasIncomeHistoryRow
 	for rows.Next() {
-		var i ReturnIncomeHistoryRow
-		if err := rows.Scan(&i.ResourceName, &i.Income, &i.ChangeTimestamp); err != nil {
+		var i ReturnGasIncomeHistoryRow
+		if err := rows.Scan(&i.Income, &i.ChangeTimestamp); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -138,27 +137,73 @@ func (q *Queries) ReturnIncomeHistory(ctx context.Context, userID int64) ([]Retu
 	return items, nil
 }
 
-const updateIncomeHistory = `-- name: UpdateIncomeHistory :exec
-INSERT INTO income_history(
-    resource_name, income, user_id, change_timestamp
+const returnMetalIncomeHistory = `-- name: ReturnMetalIncomeHistory :many
+SELECT income, change_timestamp FROM metal_income_history
+WHERE user_id = ?
+`
+
+type ReturnMetalIncomeHistoryRow struct {
+	Income          int64 `json:"income"`
+	ChangeTimestamp int64 `json:"change_timestamp"`
+}
+
+func (q *Queries) ReturnMetalIncomeHistory(ctx context.Context, userID int64) ([]ReturnMetalIncomeHistoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, returnMetalIncomeHistory, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReturnMetalIncomeHistoryRow
+	for rows.Next() {
+		var i ReturnMetalIncomeHistoryRow
+		if err := rows.Scan(&i.Income, &i.ChangeTimestamp); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateGasIncomeHistory = `-- name: UpdateGasIncomeHistory :exec
+INSERT INTO gas_income_history(
+    income, user_id, change_timestamp
 ) VALUES (
-?, ?, ?, ?
+?, ?, ?
 )
 `
 
-type UpdateIncomeHistoryParams struct {
-	ResourceName    string `json:"resource_name"`
-	Income          int64  `json:"income"`
-	UserID          int64  `json:"user_id"`
-	ChangeTimestamp int64  `json:"change_timestamp"`
+type UpdateGasIncomeHistoryParams struct {
+	Income          int64 `json:"income"`
+	UserID          int64 `json:"user_id"`
+	ChangeTimestamp int64 `json:"change_timestamp"`
 }
 
-func (q *Queries) UpdateIncomeHistory(ctx context.Context, arg UpdateIncomeHistoryParams) error {
-	_, err := q.db.ExecContext(ctx, updateIncomeHistory,
-		arg.ResourceName,
-		arg.Income,
-		arg.UserID,
-		arg.ChangeTimestamp,
-	)
+func (q *Queries) UpdateGasIncomeHistory(ctx context.Context, arg UpdateGasIncomeHistoryParams) error {
+	_, err := q.db.ExecContext(ctx, updateGasIncomeHistory, arg.Income, arg.UserID, arg.ChangeTimestamp)
+	return err
+}
+
+const updateMetalIncomeHistory = `-- name: UpdateMetalIncomeHistory :exec
+INSERT INTO metal_income_history(
+    income, user_id, change_timestamp
+) VALUES (
+?, ?, ?
+)
+`
+
+type UpdateMetalIncomeHistoryParams struct {
+	Income          int64 `json:"income"`
+	UserID          int64 `json:"user_id"`
+	ChangeTimestamp int64 `json:"change_timestamp"`
+}
+
+func (q *Queries) UpdateMetalIncomeHistory(ctx context.Context, arg UpdateMetalIncomeHistoryParams) error {
+	_, err := q.db.ExecContext(ctx, updateMetalIncomeHistory, arg.Income, arg.UserID, arg.ChangeTimestamp)
 	return err
 }
