@@ -15,7 +15,7 @@ INSERT INTO users (
 ) VALUES (
   ?, ?, ?
 )
-RETURNING id, username, password, created_at
+RETURNING id, username, password, created_at, metal_extractor_lvl, gas_extractor_lvl, total_gas_expenses, total_metal_expenses
 `
 
 type CreateUserParams struct {
@@ -32,12 +32,16 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Username,
 		&i.Password,
 		&i.CreatedAt,
+		&i.MetalExtractorLvl,
+		&i.GasExtractorLvl,
+		&i.TotalGasExpenses,
+		&i.TotalMetalExpenses,
 	)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, password, created_at FROM users
+SELECT id, username, password, created_at, metal_extractor_lvl, gas_extractor_lvl, total_gas_expenses, total_metal_expenses FROM users
 WHERE id = ? LIMIT 1
 `
 
@@ -49,12 +53,16 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.Username,
 		&i.Password,
 		&i.CreatedAt,
+		&i.MetalExtractorLvl,
+		&i.GasExtractorLvl,
+		&i.TotalGasExpenses,
+		&i.TotalMetalExpenses,
 	)
 	return i, err
 }
 
 const getUserByUserName = `-- name: GetUserByUserName :one
-SELECT id, username, password, created_at FROM users
+SELECT id, username, password, created_at, metal_extractor_lvl, gas_extractor_lvl, total_gas_expenses, total_metal_expenses FROM users
 WHERE username = ? LIMIT 1
 `
 
@@ -66,8 +74,53 @@ func (q *Queries) GetUserByUserName(ctx context.Context, username string) (User,
 		&i.Username,
 		&i.Password,
 		&i.CreatedAt,
+		&i.MetalExtractorLvl,
+		&i.GasExtractorLvl,
+		&i.TotalGasExpenses,
+		&i.TotalMetalExpenses,
 	)
 	return i, err
+}
+
+const getUserExpenses = `-- name: GetUserExpenses :one
+SELECT total_gas_expenses, total_metal_expenses FROM users
+WHERE id = ? LIMIT 1
+`
+
+type GetUserExpensesRow struct {
+	TotalGasExpenses   int64 `json:"total_gas_expenses"`
+	TotalMetalExpenses int64 `json:"total_metal_expenses"`
+}
+
+func (q *Queries) GetUserExpenses(ctx context.Context, id int64) (GetUserExpensesRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserExpenses, id)
+	var i GetUserExpensesRow
+	err := row.Scan(&i.TotalGasExpenses, &i.TotalMetalExpenses)
+	return i, err
+}
+
+const getUserGasExtractorLevel = `-- name: GetUserGasExtractorLevel :one
+SELECT gas_extractor_lvl FROM users
+WHERE id = ?
+`
+
+func (q *Queries) GetUserGasExtractorLevel(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getUserGasExtractorLevel, id)
+	var gas_extractor_lvl int64
+	err := row.Scan(&gas_extractor_lvl)
+	return gas_extractor_lvl, err
+}
+
+const getUserMetalExtractorLevel = `-- name: GetUserMetalExtractorLevel :one
+SELECT metal_extractor_lvl FROM users
+WHERE id = ?
+`
+
+func (q *Queries) GetUserMetalExtractorLevel(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getUserMetalExtractorLevel, id)
+	var metal_extractor_lvl int64
+	err := row.Scan(&metal_extractor_lvl)
+	return metal_extractor_lvl, err
 }
 
 const listUsers = `-- name: ListUsers :many
@@ -205,5 +258,41 @@ type UpdateMetalIncomeHistoryParams struct {
 
 func (q *Queries) UpdateMetalIncomeHistory(ctx context.Context, arg UpdateMetalIncomeHistoryParams) error {
 	_, err := q.db.ExecContext(ctx, updateMetalIncomeHistory, arg.Income, arg.UserID, arg.ChangeTimestamp)
+	return err
+}
+
+const updateTotalExpenses = `-- name: UpdateTotalExpenses :exec
+UPDATE users SET total_gas_expenses = ? + users.total_gas_expenses, total_metal_expenses = ? + users.total_metal_expenses
+WHERE id = ?
+`
+
+type UpdateTotalExpensesParams struct {
+	TotalGasExpenses   int64 `json:"total_gas_expenses"`
+	TotalMetalExpenses int64 `json:"total_metal_expenses"`
+	ID                 int64 `json:"id"`
+}
+
+func (q *Queries) UpdateTotalExpenses(ctx context.Context, arg UpdateTotalExpensesParams) error {
+	_, err := q.db.ExecContext(ctx, updateTotalExpenses, arg.TotalGasExpenses, arg.TotalMetalExpenses, arg.ID)
+	return err
+}
+
+const updateUserGasExtractorLevel = `-- name: UpdateUserGasExtractorLevel :exec
+UPDATE users SET gas_extractor_lvl = 1 + users.gas_extractor_lvl
+WHERE id = ?
+`
+
+func (q *Queries) UpdateUserGasExtractorLevel(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, updateUserGasExtractorLevel, id)
+	return err
+}
+
+const updateUserMetalExtractorLevel = `-- name: UpdateUserMetalExtractorLevel :exec
+UPDATE users SET metal_extractor_lvl = 1 + users.metal_extractor_lvl
+WHERE id = ?
+`
+
+func (q *Queries) UpdateUserMetalExtractorLevel(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, updateUserMetalExtractorLevel, id)
 	return err
 }

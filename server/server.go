@@ -19,11 +19,12 @@ import (
 var ddl string
 
 type Server struct {
-	Logger         *slog.Logger
-	Queries        *models.Queries
-	ctx            context.Context
-	sessionManager *scs.SessionManager
-	resources      resources.Resources
+	Logger           *slog.Logger
+	Queries          *models.Queries
+	ctx              context.Context
+	sessionManager   *scs.SessionManager
+	resources        resources.Resources
+	resourcesHistory resources.ResourcesHistory
 }
 
 func NewServer(db *sql.DB) *Server {
