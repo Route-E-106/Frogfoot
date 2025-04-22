@@ -1,8 +1,11 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
+	"net/http/cookiejar"
 	"sort"
 	"time"
 
@@ -13,57 +16,60 @@ type UserMenuState int
 
 const (
 	UserMenu UserMenuState = iota
-	UserBuildings
+    UserBuildings
 )
 
 type UserMenuModel struct {
 	State     UserMenuState
 	MenuIndex int
-	username  string
-	token     string
-	resources Resources
+    username  string
+    resources Resources
+    jar *cookiejar.Jar
 }
 
 type IncomeCommand struct {
-	Income    int
+	Income int
 	Timestamp time.Time
 }
 
 type ResourceHistory struct {
-	ChangeAmount int
-	Incomes      []IncomeCommand
+    ChangeAmount int
+	Incomes []IncomeCommand
 }
 
 type Resources struct {
-	Minerals ResourceHistory
-	Gas      ResourceHistory
+    Metal ResourceHistory
+    Gas ResourceHistory
 }
 
 type tickMsg time.Time
+type tickRequestMsg time.Time
 
-func NewUserMenu(username string, token string) UserMenuModel {
-	model := UserMenuModel{
-		State:     UserMenu,
-		MenuIndex: 0,
-		username:  username,
-		token:     token,
-	}
+func NewUserMenu(username string, jar *cookiejar.Jar) UserMenuModel {
+    model := UserMenuModel{
+        State:     UserMenu,
+        MenuIndex: 0,
+        username:  username,
+        jar: jar,
+    }
 
-	model.updateResources()
+    model.updateResources();
 
-	return model
+    return model
 }
 
 func (m UserMenuModel) Tick() tea.Msg {
-	return tickMsg(time.Now())
+    return tickRequestMsg(time.Now())
 }
 
 func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
-	switch msg.(type) {
-	case tickMsg:
-		m.updateResources()
-		return m, m.tick()
-	}
+    switch msg.(type) {
+    case tickRequestMsg:
+        m.updateResources()
+        return m, tea.Batch(m.tick(), m.tickRequest())
+    case tickMsg:
+        return m, m.tick()
+    }
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "up":
@@ -78,55 +84,51 @@ func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
 		}
 	}
 
-	return m, nil
+    return m, nil
 }
 
 func (m *UserMenuModel) View() string {
-	minerals := m.resources.Minerals.CalculateResources()
-	gas := m.resources.Gas.CalculateResources()
+    metal := m.resources.Metal.CalculateResources()
+    gas := m.resources.Gas.CalculateResources()
 
-	s := fmt.Sprintf("[User] %s", m.username)
-	s += fmt.Sprintf("\n\n[Minerals] %d [Gas] %d", minerals, gas)
-	cursor := func(i int) string {
-		if m.MenuIndex == i {
-			return "➜ "
-		}
-		return "  "
-	}
-	return fmt.Sprintf(
-		"\n%s\n\n%sBuildings\n%sShips\n%sLogout\n(Use ↑/↓ and Enter)",
-		s, cursor(0), cursor(1), cursor(2),
-	)
+    s := fmt.Sprintf("[User] %s", m.username)
+    s += fmt.Sprintf("\n\n[Metal] %d [Gas] %d", metal, gas)
+    cursor := func(i int) string {
+        if m.MenuIndex == i {
+            return "➜ "
+        }
+        return "  "
+    }
+    return fmt.Sprintf(
+        "\n%s\n\n%sBuildings\n%sShips\n%sLogout\n\n(Use ↑/↓ and Enter)",
+        s, cursor(0), cursor(1), cursor(2),
+    )
+}
+func (m UserMenuModel) tickRequest() tea.Cmd {
+    return tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
+        return tickRequestMsg(t)
+    })
 }
 
 func (m UserMenuModel) tick() tea.Cmd {
-	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-		return tickMsg(t)
-	})
+    return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+        return tickMsg(t)
+    })
 }
 
 func (m *UserMenuModel) updateResources() {
-	minerals, err := getResourceHistory(m.token)
-	if err != nil {
-		return
-	}
-	gas, err := getResourceHistory(m.token)
+    resources, err := getResources(m.jar); 
+    if err != nil {
+        return; 
+    }
 
-	if err != nil {
-		return
-	}
-
-	m.resources = Resources{
-		Minerals: minerals,
-		Gas:      gas,
-	}
-
-	return
+    m.resources = *resources 
+    return
 }
 func (history ResourceHistory) CalculateResources() int {
 
-	currentTime := time.Now()
-	commands := history.Incomes
+    currentTime := time.Now()
+    commands := history.Incomes
 	if len(commands) == 0 {
 		return history.ChangeAmount
 	}
@@ -161,15 +163,59 @@ func (history ResourceHistory) CalculateResources() int {
 		}
 	}
 
-	return int(math.Floor(total)) + history.ChangeAmount
+    return int(math.Floor(total)) + history.ChangeAmount
 }
 
-func getResourceHistory(token string) (ResourceHistory, error) {
-	commands := []IncomeCommand{
-		{Income: 1000, Timestamp: time.Date(2025, time.January, 01, 0, 0, 0, 0, time.UTC)},
-		{Income: 2000, Timestamp: time.Date(2025, time.February, 01, 0, 0, 0, 0, time.UTC)},
-		{Income: 10000, Timestamp: time.Date(2025, time.March, 01, 0, 0, 0, 0, time.UTC)},
+func getResources(jar *cookiejar.Jar) (*Resources, error) {
+
+    type rawIncome struct {
+        Income          int   `json:"income"`
+        ChangeTimestamp int64 `json:"change_timestamp"`
+    }
+
+    type rawResources struct {
+        Gas   []rawIncome `json:"gas"`
+        Metal []rawIncome `json:"metal"`
+    }
+
+    mapToResourceHistory := func (rawIncomes []rawIncome) ResourceHistory {
+        var incomes []IncomeCommand
+        for _, ri := range rawIncomes {
+            incomes = append(incomes, IncomeCommand{
+                Income:    ri.Income,
+                Timestamp: time.Unix(ri.ChangeTimestamp, 0),
+            })
+        }
+        return ResourceHistory{Incomes: incomes}
+    }
+
+    url := "http://localhost:8080/resources"
+
+    client := &http.Client{Timeout: 10 * time.Second, Jar: jar}
+
+	resp, err := client.Get(url)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 
-	return ResourceHistory{ChangeAmount: 100, Incomes: commands}, nil
+	defer resp.Body.Close()
+
+	var raw rawResources
+
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+        return nil, fmt.Errorf("Invalid json: %w", err)
+	}
+
+	if resp.StatusCode == 200 {
+        resources := &Resources{
+            Gas:   mapToResourceHistory(raw.Gas),
+            Metal: mapToResourceHistory(raw.Metal),
+        }
+
+        return resources, nil
+	}
+
+	return nil, fmt.Errorf("unexpected error: %s", resp.Status)
 }
+

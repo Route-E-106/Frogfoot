@@ -1,37 +1,109 @@
 package model
 
 import (
-	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
+	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
+	"github.com/charmbracelet/bubbles/spinner"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type RegisterState int
+
+const (
+	RegisterStateInput RegisterState = iota
+	RegisterStateRequest
+	RegisterStateSucceeded
+	RegisterStateError
+)
+
+type registerResultMsg struct {
+    username string
+    success bool
+    err     error
+}
+
 type Register struct {
 	Form
+    spinner spinner.Model
+    State RegisterState
+    userMenuModel UserMenuModel 
 }
 
 func NewRegister() Register {
-	return Register{Form: NewForm()}
+    s := spinner.New()
+	s.Spinner = spinner.Dot
+
+	return Register{
+        Form: NewForm(),
+        spinner: s,
+    }
 }
 
-func (m *Register) Update(msg tea.Msg) (Register, tea.Cmd) {
+func (m Register) Update(msg tea.Msg) (Register, tea.Cmd) {
 	var cmd tea.Cmd
+	switch m.State {
+	case RegisterStateRequest:
+        switch msg := msg.(type) {
+        case registerResultMsg:
+            if msg.success {
+                m.State = RegisterStateSucceeded
+            } else {
+                m.State = RegisterStateError
+            }
+
+            return m, nil
+        }
+
+        m.spinner, cmd = m.spinner.Update(msg)
+        return m, cmd 
+	case RegisterStateSucceeded:
+        switch msg.(type) {
+        case tea.KeyMsg:
+            return m, utils.BackToMenuCmd()
+        }
+
+		return m, cmd
+	case RegisterStateError:
+        switch msg.(type) {
+        case tea.KeyMsg:
+            return m, utils.BackToMenuCmd()
+        }
+
+		return m, cmd
+    }
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "tab", "enter", "down":
-			m.MenuIndex = (m.MenuIndex + 1) % 2
+		case "tab", "down":
+			if m.MenuIndex > 0 {
+				m.MenuIndex--
+			}
+        case "enter":
+			if m.MenuIndex < 1 {
+				m.MenuIndex++
+			} else {
+                m.UsernameErr = utils.ValidateUsername(m.Username.Value())
+                m.PasswordErr = utils.ValidatePassword(m.Password.Value())
+
+                if m.UsernameErr == nil && m.PasswordErr == nil {
+                    m.State = RegisterStateRequest
+                    return m, tea.Batch(m.spinner.Tick, attemptRegister(m))
+                }
+            }
 		case "up":
 			m.MenuIndex = (m.MenuIndex - 1 + 2) % 2
 		case "esc":
             m.reset()
-            return *m, tea.Batch(utils.BackToMenuCmd())
+            return m, utils.BackToMenuCmd()
 		}
 	}
 
-	// Update field focus
 	if m.MenuIndex == 0 {
 		m.Username.Focus()
 		m.Password.Blur()
@@ -46,7 +118,7 @@ func (m *Register) Update(msg tea.Msg) (Register, tea.Cmd) {
         m.PasswordErr = utils.ValidatePassword(m.Password.Value())
 	}
 
-	return *m, cmd
+	return m, cmd
 }
 
 func (m Register) View() string {
@@ -59,11 +131,65 @@ func (m Register) View() string {
 	if m.PasswordErr != nil {
 		s += fmt.Sprintf("   [!] %s\n", m.PasswordErr.Error())
 	}
-	s += "\n[Tab/↑↓/Enter] Switch  •  [Esc] Back"
+
+	switch m.State {
+    case RegisterStateInput:
+        s += "\n[Tab/↑↓/Enter] Switch  •  [Esc] Back"
+	case RegisterStateRequest:
+        s += fmt.Sprintf("\nSending Credentials... %s", m.spinner.View())
+	case RegisterStateSucceeded:
+        s += "\n✅ Register successful!"
+	case RegisterStateError:
+        s+= "\n❌ Invalid credentials. Try again."
+    }
+
 	return s
 }
 
-func (l Register) reset() Register {
+func attemptRegister(m Register) tea.Cmd {
+    username := m.Username.Value()
+    password := m.Password.Value()
+
+    return func() tea.Msg {
+        err := register(username, password)
+        if err != nil {
+            return registerResultMsg{success: false, err: err}
+        }
+        return registerResultMsg{success: true, err: nil}
+    }
+}
+
+func register(username, password string) (error) {
+	payload := map[string]string{
+		"username": username,
+		"password": password,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+    url := "http://localhost:8080/users/register"
+
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
+
+	if err != nil {
+		return fmt.Errorf("failed to send HTTP request: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 200 {
+		return nil
+	}
+	return fmt.Errorf("unexpected error: %s", resp.Status)
+}
+
+func (l Register) reset() Register{
 	form := NewRegister()
 	return form
 }

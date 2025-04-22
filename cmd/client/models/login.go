@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+    "net/http/cookiejar"
 	"time"
 	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
     "github.com/charmbracelet/bubbles/spinner"
@@ -24,7 +25,7 @@ const (
 
 type loginResultMsg struct {
     username string
-    token string
+    jar *cookiejar.Jar
     success bool
     err     error
 }
@@ -46,7 +47,7 @@ func NewLogin() Login {
     }
 }
 
-func (m Login) Update(msg tea.Msg) (Login, tea.Cmd) {
+func (m *Login) Update(msg tea.Msg) (*Login, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.State {
 	case StateRequest:
@@ -54,7 +55,7 @@ func (m Login) Update(msg tea.Msg) (Login, tea.Cmd) {
         case loginResultMsg:
             if msg.success {
                 m.State = StateSucceeded
-                m.userMenuModel = NewUserMenu(msg.username, msg.token)
+                m.userMenuModel = NewUserMenu(msg.username, msg.jar)
             } else {
                 m.State = StateError
             }
@@ -155,28 +156,20 @@ func (m Login) View() string {
 	return s
 }
 
-func attemptLogin(m Login) tea.Cmd {
+func attemptLogin(m *Login) tea.Cmd {
     username := m.Username.Value()
     password := m.Password.Value()
 
     return func() tea.Msg {
-        token, err := simulateLogin(username, password, true)
+        jar, err := login(username, password)
         if err != nil {
             return loginResultMsg{success: false, err: err}
         }
-        return loginResultMsg{success: true, err: nil, username: username, token: token}
+        return loginResultMsg{success: true, err: nil, username: username, jar: jar}
     }
 }
 
-func simulateLogin(username, password string, overrideHttpRequest bool) (string, error) {
-    if (overrideHttpRequest) {
-
-        if password == "fail" {
-            return "", fmt.Errorf("invalid password")
-        }
-
-        return "Override", nil
-    }
+func login(username, password string) (*cookiejar.Jar, error) {
 
 	payload := map[string]string{
 		"username": username,
@@ -186,32 +179,34 @@ func simulateLogin(username, password string, overrideHttpRequest bool) (string,
 	payloadBytes, err := json.Marshal(payload)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	url := "https://httpbin.org/post"
+    jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create jar: %w", err)
+	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+    url := "http://localhost:8080/users/login"
+
+    client := &http.Client{Timeout: 10 * time.Second, Jar: jar}
 
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
 
 	if err != nil {
-		return "", fmt.Errorf("failed to send HTTP request: %w", err)
+		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 
 	defer resp.Body.Close()
 
-	if password == "fail" {
-		return "", fmt.Errorf("invalid password")
+	if resp.StatusCode == 200 {
+		return jar, nil
 	}
 
-	if resp.StatusCode == 200 {
-		return "custom_token", nil
-	}
-	return "", fmt.Errorf("unexpected error: %s", resp.Status)
+	return nil, fmt.Errorf("unexpected error: %s", resp.Status)
 }
 
-func (l Login) reset() Login {
+func (l *Login) reset() Login {
 	form := NewLogin()
 	return form
 }
