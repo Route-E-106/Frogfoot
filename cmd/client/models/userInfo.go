@@ -1,10 +1,11 @@
 package model
 
 import (
-    "fmt"
+	"fmt"
 	"math"
 	"sort"
 	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -12,57 +13,57 @@ type UserMenuState int
 
 const (
 	UserMenu UserMenuState = iota
-    UserBuildings
+	UserBuildings
 )
 
 type UserMenuModel struct {
 	State     UserMenuState
 	MenuIndex int
-    username  string
-    token     string
-    resources Resources
+	username  string
+	token     string
+	resources Resources
 }
 
 type IncomeCommand struct {
-	Income int
+	Income    int
 	Timestamp time.Time
 }
 
 type ResourceHistory struct {
-    ChangeAmount int
-	Incomes []IncomeCommand
+	ChangeAmount int
+	Incomes      []IncomeCommand
 }
 
 type Resources struct {
-    Minerals ResourceHistory
-    Gas ResourceHistory
+	Minerals ResourceHistory
+	Gas      ResourceHistory
 }
 
 type tickMsg time.Time
 
 func NewUserMenu(username string, token string) UserMenuModel {
-    model := UserMenuModel{
-        State:     UserMenu,
-        MenuIndex: 0,
-        username:  username,
-        token:     token,
-    }
+	model := UserMenuModel{
+		State:     UserMenu,
+		MenuIndex: 0,
+		username:  username,
+		token:     token,
+	}
 
-    model.updateResources();
+	model.updateResources()
 
-    return model
+	return model
 }
 
 func (m UserMenuModel) Tick() tea.Msg {
-    return tickMsg(time.Now())
+	return tickMsg(time.Now())
 }
 
 func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
-    switch msg.(type) {
-    case tickMsg:
-        m.updateResources()
-        return m, m.tick()
-    }
+	switch msg.(type) {
+	case tickMsg:
+		m.updateResources()
+		return m, m.tick()
+	}
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "up":
@@ -77,55 +78,55 @@ func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
 		}
 	}
 
-    return m, nil
+	return m, nil
 }
 
 func (m *UserMenuModel) View() string {
-    minerals := m.resources.Minerals.CalculateResources()
-    gas := m.resources.Gas.CalculateResources()
+	minerals := m.resources.Minerals.CalculateResources()
+	gas := m.resources.Gas.CalculateResources()
 
-    s := fmt.Sprintf("[User] %s", m.username)
-    s += fmt.Sprintf("\n\n[Minerals] %d [Gas] %d", minerals, gas)
-    cursor := func(i int) string {
-        if m.MenuIndex == i {
-            return "➜ "
-        }
-        return "  "
-    }
-    return fmt.Sprintf(
-        "\n%s\n\n%sBuildings\n%sShips\n%sLogout\n(Use ↑/↓ and Enter)",
-        s, cursor(0), cursor(1), cursor(2),
-    )
+	s := fmt.Sprintf("[User] %s", m.username)
+	s += fmt.Sprintf("\n\n[Minerals] %d [Gas] %d", minerals, gas)
+	cursor := func(i int) string {
+		if m.MenuIndex == i {
+			return "➜ "
+		}
+		return "  "
+	}
+	return fmt.Sprintf(
+		"\n%s\n\n%sBuildings\n%sShips\n%sLogout\n(Use ↑/↓ and Enter)",
+		s, cursor(0), cursor(1), cursor(2),
+	)
 }
 
 func (m UserMenuModel) tick() tea.Cmd {
-    return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-        return tickMsg(t)
-    })
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
 }
 
 func (m *UserMenuModel) updateResources() {
-    minerals, err := getResourceHistory(m.token); 
-    if err != nil {
-        return; 
-    }
-    gas, err := getResourceHistory(m.token); 
+	minerals, err := getResourceHistory(m.token)
+	if err != nil {
+		return
+	}
+	gas, err := getResourceHistory(m.token)
 
-    if err != nil {
-        return;
-    }
+	if err != nil {
+		return
+	}
 
-    m.resources = Resources {
-        Minerals: minerals,
-        Gas: gas,
-    }
+	m.resources = Resources{
+		Minerals: minerals,
+		Gas:      gas,
+	}
 
-    return
+	return
 }
 func (history ResourceHistory) CalculateResources() int {
 
-    currentTime := time.Now()
-    commands := history.Incomes
+	currentTime := time.Now()
+	commands := history.Incomes
 	if len(commands) == 0 {
 		return history.ChangeAmount
 	}
@@ -160,15 +161,15 @@ func (history ResourceHistory) CalculateResources() int {
 		}
 	}
 
-    return int(math.Floor(total)) + history.ChangeAmount
+	return int(math.Floor(total)) + history.ChangeAmount
 }
 
 func getResourceHistory(token string) (ResourceHistory, error) {
-    commands := []IncomeCommand{
-        {Income: 1000, Timestamp: time.Date(2025, time.January, 01, 0, 0, 0, 0, time.UTC)},
-        {Income: 2000, Timestamp: time.Date(2025, time.February, 01, 0, 0, 0, 0, time.UTC)},
-        {Income: 10000, Timestamp: time.Date(2025, time.March, 01, 0, 0, 0, 0, time.UTC)},
+	commands := []IncomeCommand{
+		{Income: 1000, Timestamp: time.Date(2025, time.January, 01, 0, 0, 0, 0, time.UTC)},
+		{Income: 2000, Timestamp: time.Date(2025, time.February, 01, 0, 0, 0, 0, time.UTC)},
+		{Income: 10000, Timestamp: time.Date(2025, time.March, 01, 0, 0, 0, 0, time.UTC)},
 	}
 
-    return ResourceHistory{ChangeAmount: 100, Incomes: commands}, nil
+	return ResourceHistory{ChangeAmount: 100, Incomes: commands}, nil
 }

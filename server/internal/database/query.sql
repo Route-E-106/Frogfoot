@@ -6,6 +6,13 @@ WHERE id = ? LIMIT 1;
 SELECT * FROM users
 WHERE username = ? LIMIT 1;
 
+-- name: GetUserMetalExtractorLevel :one
+SELECT metal_extractor_lvl FROM users
+WHERE id = ?;
+-- name: GetUserGasExtractorLevel :one
+SELECT gas_extractor_lvl FROM users
+WHERE id = ?;
+
 -- name: ListUsers :many
 SELECT id, username, created_at FROM users
 ORDER BY username;
@@ -17,6 +24,22 @@ INSERT INTO users (
   ?, ?, ?
 )
 RETURNING *;
+
+-- name: UpdateUserMetalExtractorLevel :exec
+UPDATE users SET metal_extractor_lvl = 1 + users.metal_extractor_lvl
+WHERE id = ?;
+
+-- name: UpdateUserGasExtractorLevel :exec
+UPDATE users SET gas_extractor_lvl = 1 + users.gas_extractor_lvl
+WHERE id = ?;
+
+-- name: GetUserExpenses :one
+SELECT total_gas_expenses, total_metal_expenses FROM users
+WHERE id = ? LIMIT 1;
+
+-- name: UpdateTotalExpenses :exec
+UPDATE users SET total_gas_expenses = ? + users.total_gas_expenses, total_metal_expenses = ? + users.total_metal_expenses
+WHERE id = ?;
 
 -- name: ReturnGasIncomeHistory :many
 SELECT income, change_timestamp FROM gas_income_history
