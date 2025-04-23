@@ -104,6 +104,7 @@ func (m *UserMenuModel) View() string {
         s, cursor(0), cursor(1), cursor(2),
     )
 }
+
 func (m UserMenuModel) tickRequest() tea.Cmd {
     return tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
         return tickRequestMsg(t)
@@ -125,6 +126,7 @@ func (m *UserMenuModel) updateResources() {
     m.resources = *resources 
     return
 }
+
 func (history ResourceHistory) CalculateResources() (int64, int) {
 
     currentTime := time.Now()
