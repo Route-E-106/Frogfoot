@@ -228,4 +228,3 @@ func getResources(jar *cookiejar.Jar) (*Resources, error) {
 
 	return nil, fmt.Errorf("unexpected error: %s", resp.Status)
 }
-
