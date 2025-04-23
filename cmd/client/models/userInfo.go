@@ -33,7 +33,7 @@ type IncomeCommand struct {
 }
 
 type ResourceHistory struct {
-    ChangeAmount int
+    TotalExpenses int64
 	Incomes []IncomeCommand
 }
 
@@ -88,11 +88,11 @@ func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
 }
 
 func (m *UserMenuModel) View() string {
-    metal := m.resources.Metal.CalculateResources()
-    gas := m.resources.Gas.CalculateResources()
+    metal, metalIncome := m.resources.Metal.CalculateResources()
+    gas, gasIncome := m.resources.Gas.CalculateResources()
 
     s := fmt.Sprintf("[User] %s", m.username)
-    s += fmt.Sprintf("\n\n[Metal] %d [Gas] %d", metal, gas)
+    s += fmt.Sprintf("\n\n[Metal] %d|%d [Gas] %d|%d", metal, metalIncome, gas, gasIncome)
     cursor := func(i int) string {
         if m.MenuIndex == i {
             return "➜ "
@@ -125,12 +125,12 @@ func (m *UserMenuModel) updateResources() {
     m.resources = *resources 
     return
 }
-func (history ResourceHistory) CalculateResources() int {
+func (history ResourceHistory) CalculateResources() (int64, int) {
 
     currentTime := time.Now()
     commands := history.Incomes
 	if len(commands) == 0 {
-		return history.ChangeAmount
+		return history.TotalExpenses, 0
 	}
 
 	sort.Slice(commands, func(i, j int) bool {
@@ -138,6 +138,7 @@ func (history ResourceHistory) CalculateResources() int {
 	})
 
 	total := 0.0
+    var income int
 
 	for i := range commands {
 		start := commands[i].Timestamp
@@ -157,13 +158,14 @@ func (history ResourceHistory) CalculateResources() int {
 			end = currentTime
 		}
 
+        income = commands[i].Income
 		duration := end.Sub(start).Hours()
 		if duration > 0 {
-			total += duration * float64(commands[i].Income)
+			total += duration * float64(income)
 		}
 	}
 
-    return int(math.Floor(total)) + history.ChangeAmount
+    return int64(math.Floor(total)) + history.TotalExpenses, income
 }
 
 func getResources(jar *cookiejar.Jar) (*Resources, error) {
@@ -173,12 +175,18 @@ func getResources(jar *cookiejar.Jar) (*Resources, error) {
         ChangeTimestamp int64 `json:"change_timestamp"`
     }
 
-    type rawResources struct {
-        Gas   []rawIncome `json:"gas"`
-        Metal []rawIncome `json:"metal"`
+    type rawExpenses struct {
+        TotalGasExpenses   int64 `json:"total_gas_expenses"`
+        TotalMetalExpenses int64 `json:"total_metal_expenses"`
     }
 
-    mapToResourceHistory := func (rawIncomes []rawIncome) ResourceHistory {
+    type rawResources struct {
+        Gas   []rawIncome         `json:"gas"`
+        Metal []rawIncome         `json:"metal"`
+        TotalExpenses rawExpenses `json:"expenses"`
+    }
+
+    mapToResourceHistory := func (rawIncomes []rawIncome, totalExpenses int64) ResourceHistory {
         var incomes []IncomeCommand
         for _, ri := range rawIncomes {
             incomes = append(incomes, IncomeCommand{
@@ -186,10 +194,10 @@ func getResources(jar *cookiejar.Jar) (*Resources, error) {
                 Timestamp: time.Unix(ri.ChangeTimestamp, 0),
             })
         }
-        return ResourceHistory{Incomes: incomes}
+        return ResourceHistory{Incomes: incomes, TotalExpenses: totalExpenses}
     }
 
-    url := "http://localhost:8080/resources"
+    url := "http://localhost:8080/resources/history"
 
     client := &http.Client{Timeout: 10 * time.Second, Jar: jar}
 
@@ -209,8 +217,8 @@ func getResources(jar *cookiejar.Jar) (*Resources, error) {
 
 	if resp.StatusCode == 200 {
         resources := &Resources{
-            Gas:   mapToResourceHistory(raw.Gas),
-            Metal: mapToResourceHistory(raw.Metal),
+            Gas:   mapToResourceHistory(raw.Gas, raw.TotalExpenses.TotalGasExpenses),
+            Metal: mapToResourceHistory(raw.Metal, raw.TotalExpenses.TotalMetalExpenses),
         }
 
         return resources, nil
