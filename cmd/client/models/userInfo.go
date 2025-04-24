@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"sort"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,6 +26,7 @@ type UserMenuModel struct {
     username  string
     resources Resources
     jar *cookiejar.Jar
+    BuildingsModel BuildingsModel
 }
 
 type IncomeCommand struct {
@@ -51,6 +53,7 @@ func NewUserMenu(username string, jar *cookiejar.Jar) UserMenuModel {
         MenuIndex: 0,
         username:  username,
         jar: jar,
+        BuildingsModel: NewBuildingsMenu(jar),
     }
 
     model.updateResources();
@@ -70,6 +73,23 @@ func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
     case tickMsg:
         return m, m.tick()
     }
+    switch m.State {
+
+    case UserBuildings:
+        switch msg := msg.(type) {
+            case tea.KeyMsg:
+                switch msg.String() {
+                case "esc":
+                    m.State = UserMenu
+                    return m, nil
+            }
+        }
+
+		buildingsModel, cmd := m.BuildingsModel.Update(msg)
+		m.BuildingsModel = buildingsModel
+		return m, cmd
+    }
+
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "up":
@@ -81,6 +101,9 @@ func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
 				m.MenuIndex++
 			}
 		case "enter":
+            if m.MenuIndex == 0 {
+                m.State = UserBuildings
+            }
 		}
 	}
 
@@ -99,10 +122,24 @@ func (m *UserMenuModel) View() string {
         }
         return "  "
     }
-    return fmt.Sprintf(
-        "\n%s\n\n%sBuildings\n%sShips\n%sLogout\n\n(Use ↑/↓ and Enter)",
-        s, cursor(0), cursor(1), cursor(2),
-    )
+
+    switch m.State {
+    case UserMenu:
+        return fmt.Sprintf(
+            "\n%s\n\n%sBuildings\n%sShips\n%sLogout\n\n(Use ↑/↓ and Enter)",
+            s, cursor(0), cursor(1), cursor(2),
+        )
+    case UserBuildings:
+        view := m.BuildingsModel.View()
+        var lines []string
+        for _, line := range strings.Split(view, "\n") {
+            lines = append(lines, line)
+        }
+        lines = append(lines, "(Use ↑/↓ and Enter)")
+        return s + strings.Join(lines, "\n")
+    }
+
+    return s
 }
 
 func (m UserMenuModel) tickRequest() tea.Cmd {

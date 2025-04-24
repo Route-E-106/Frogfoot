@@ -3,24 +3,22 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"net/http/cookiejar"
-	"sort"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type BuildingsModel struct {
-	UserMenu     UserMenuModel
 	MenuIndex int
+    jar *cookiejar.Jar
 }
 
-func BuildingsMenu(userModel UserMenuModel) BuildingsModel {
+func NewBuildingsMenu(jar *cookiejar.Jar) BuildingsModel {
     model := BuildingsModel{
-        UserMenu:  userModel,
         MenuIndex: 0,
+        jar: jar,
     }
 
     return model
@@ -34,7 +32,7 @@ func (m BuildingsModel) Update(msg tea.Msg) (BuildingsModel, tea.Cmd) {
 				m.MenuIndex--
 			}
 		case "down":
-			if m.MenuIndex < 2 {
+			if m.MenuIndex < 1 {
 				m.MenuIndex++
 			}
 		case "enter":
@@ -45,19 +43,65 @@ func (m BuildingsModel) Update(msg tea.Msg) (BuildingsModel, tea.Cmd) {
 }
 
 func (m *BuildingsModel) View() string {
-    metal, metalIncome := m.resources.Metal.CalculateResources()
-    gas, gasIncome := m.resources.Gas.CalculateResources()
+    costMetal, err := getCost(m.jar, "metalExtractor")
+    if err != nil {
+        return "Error" 
+    }
 
-    s := fmt.Sprintf("[User] %s", m.username)
-    s += fmt.Sprintf("\n\n[Metal] %d|%d [Gas] %d|%d", metal, metalIncome, gas, gasIncome)
+    costGas, err := getCost(m.jar, "gasExtractor")
+    if err != nil {
+        return "Error" 
+    }
+
     cursor := func(i int) string {
         if m.MenuIndex == i {
             return "➜ "
         }
         return "  "
     }
+
+    cost := func(i BuildingCost) string {
+        return fmt.Sprintf(
+            "\tCost\n\t[Metal] :: %d\n\t[Gas] :: %d\n",
+            i.MetalCost, i.GasCost,
+        )
+    }
+
     return fmt.Sprintf(
-        "\n%s\n\n%sBuildings\n%sShips\n%sLogout\n\n(Use ↑/↓ and Enter)",
-        s, cursor(0), cursor(1), cursor(2),
+        "[Buildings]\n\n%sMetal Extractor\n%s\n%sGas Extractor\n%s\n\n",
+        cursor(0), cost(*costMetal), cursor(1), cost(*costGas),
     )
+}
+
+type BuildingCost struct {
+    GasCost   int64 `json:"gasCost"`
+    MetalCost int64 `json:"metalCost"`
+}
+
+func getCost(jar *cookiejar.Jar, sufix string) (*BuildingCost, error) {
+
+    url := "http://localhost:8080/buildings/" + sufix
+
+    client := &http.Client{Timeout: 10 * time.Second, Jar: jar}
+
+	resp, err := client.Get(url)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	var cost BuildingCost
+
+	if err := json.NewDecoder(resp.Body).Decode(&cost); err != nil {
+        return nil, fmt.Errorf("Invalid json: %w", err)
+	}
+
+	if resp.StatusCode == 200 {
+
+        return &cost, nil
+	}
+
+	return nil, fmt.Errorf("unexpected error: %s", resp.Status)
 }

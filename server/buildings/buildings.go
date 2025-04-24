@@ -11,8 +11,8 @@ package buildings
 // )
 
 type BuildingCost struct {
-	GasCost   int64
-	MetalCost int64
+	GasCost   int64 `json:"gasCost"`
+	MetalCost int64 `json:"metalCost"`
 }
 
 var MetalBuildingCostPerLevel = map[int64]BuildingCost{
