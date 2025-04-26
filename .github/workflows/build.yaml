@@ -27,7 +27,7 @@ jobs:
   container:
     name: Container
     # needs: [build]
-    if: github.ref == 'refs/head/main'
+    # if: github.ref == 'refs/head/main'
     runs-on: ubuntu-latest
     strategy:
       matrix:
