@@ -9,6 +9,7 @@ import (
 	"time"
 	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
     "github.com/charmbracelet/bubbles/spinner"
+    "github.com/charmbracelet/lipgloss"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -40,6 +41,7 @@ type Login struct {
 func NewLogin() Login {
     s := spinner.New()
 	s.Spinner = spinner.Dot
+    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return Login{
         Form: NewForm(),
@@ -130,7 +132,23 @@ func (m *Login) Update(msg tea.Msg) (*Login, tea.Cmd) {
 }
 
 func (m Login) View() string {
-	s := "Login\n\n"
+
+    var boxStyle = lipgloss.NewStyle().
+        Border(lipgloss.NormalBorder()).
+        BorderForeground(lipgloss.Color("63")).
+        Padding(5, 20)
+
+    var titleStyle = lipgloss.NewStyle().
+        Bold(true).
+        Foreground(lipgloss.Color("63")).
+        Padding(0, 1)
+
+    box := boxStyle.Render(
+        lipgloss.JoinVertical(lipgloss.Left, titleStyle.Render("Frogfoot")),
+    )
+
+	s := box + "\n\n" + "Login\n\n"
+
 	s += "Username: " + m.Username.View() + "\n"
 	if m.UsernameErr != nil {
 		s += fmt.Sprintf("   [!] %s\n", m.UsernameErr.Error())
@@ -161,6 +179,7 @@ func attemptLogin(m *Login) tea.Cmd {
     password := m.Password.Value()
 
     return func() tea.Msg {
+        time.Sleep(2 * time.Second)
         jar, err := login(username, password)
         if err != nil {
             return loginResultMsg{success: false, err: err}
