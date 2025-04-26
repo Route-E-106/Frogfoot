@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"sort"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -114,8 +113,9 @@ func (m *UserMenuModel) View() string {
     metal, metalIncome := m.resources.Metal.CalculateResources()
     gas, gasIncome := m.resources.Gas.CalculateResources()
 
-    s := fmt.Sprintf("[User] %s", m.username)
+    s := fmt.Sprintf("\n[User] %s", m.username)
     s += fmt.Sprintf("\n\n[Metal] %d|%d [Gas] %d|%d", metal, metalIncome, gas, gasIncome)
+    s += "\n---------------------------------------------\n"
     cursor := func(i int) string {
         if m.MenuIndex == i {
             return "➜ "
@@ -126,17 +126,11 @@ func (m *UserMenuModel) View() string {
     switch m.State {
     case UserMenu:
         return fmt.Sprintf(
-            "\n%s\n\n%sBuildings\n%sShips\n%sLogout\n\n(Use ↑/↓ and Enter)",
+            "%s\n%sBuildings\n%sShips\n%sLogout\n\n(Use ↑/↓ and Enter)",
             s, cursor(0), cursor(1), cursor(2),
         )
     case UserBuildings:
-        view := m.BuildingsModel.View()
-        var lines []string
-        for _, line := range strings.Split(view, "\n") {
-            lines = append(lines, line)
-        }
-        lines = append(lines, "(Use ↑/↓ and Enter)")
-        return s + strings.Join(lines, "\n")
+        return s + "\n" + m.BuildingsModel.View() + "\n\n(Use ↑/↓ and Enter)"
     }
 
     return s
