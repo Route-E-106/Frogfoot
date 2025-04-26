@@ -23,11 +23,14 @@ type BuildingsModel struct {
     jar       *cookiejar.Jar
     CostMetal BuildingCost
     CostGas   BuildingCost
+    resources utils.Resources
+    Metal     int64
+    Gas       int64
 }
 
 type requestResourcesMsg time.Time
 
-func NewBuildingsMenu(jar *cookiejar.Jar) BuildingsModel {
+func NewBuildingsMenu(jar *cookiejar.Jar, resources utils.Resources) BuildingsModel {
     costMetal, _ := getCost(jar, "metalExtractor")
 
     costGas, _ := getCost(jar, "gasExtractor")
@@ -43,21 +46,28 @@ func NewBuildingsMenu(jar *cookiejar.Jar) BuildingsModel {
 }
 
 func (m BuildingsModel) Update(msg tea.Msg) (BuildingsModel, tea.Cmd) {
+    metal, _ := m.resources.Metal.CalculateResources();
+    gas, _ := m.resources.Metal.CalculateResources();
+
+    m.Metal = metal
+    m.Gas = gas
+
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "up":
-			if m.MenuIndex > 0 {
+			if m.MenuIndex == 1 && metal >= m.CostMetal.MetalCost && gas >= m.CostMetal.GasCost {
 				m.MenuIndex--
 			}
 		case "down":
-			if m.MenuIndex < 1 {
+			if m.MenuIndex == 0 && metal >= m.CostGas.MetalCost && gas >= m.CostGas.GasCost {
 				m.MenuIndex++
 			}
 		case "enter":
-            if m.MenuIndex == 0 {
+            if m.MenuIndex == 0 && metal >= m.CostMetal.MetalCost && gas >= m.CostMetal.GasCost {
                 upgradeBuilding(m.jar, "metalExtractor")
             }
-            if m.MenuIndex == 1 {
+
+            if m.MenuIndex == 1 && metal >= m.CostGas.MetalCost && gas >= m.CostGas.GasCost {
                 upgradeBuilding(m.jar, "gasExtractor")
             }
 
@@ -81,14 +91,38 @@ func sendRequest() tea.Cmd {
 
 func (m *BuildingsModel) View() string {
 
-    cursor := func(i int, text string) string {
-        var selectedStyle = lipgloss.NewStyle().
-            Foreground(lipgloss.Color(utils.Color))
+    getMetal := func() string {
+        if m.Metal >= m.CostMetal.MetalCost && m.Gas >= m.CostMetal.GasCost {
+            selectedStyle := lipgloss.NewStyle().
+                Foreground(lipgloss.Color(utils.Color))
 
-        if m.MenuIndex == i {
-            return selectedStyle.Render("➜ " + text)
+            if m.MenuIndex == 0 {
+                return selectedStyle.Render("➜ Metal Extractor")
+            }
+            return "  Metal Extractor"
+        } else {
+            selectedStyle := lipgloss.NewStyle().
+                Foreground(lipgloss.Color("8"))
+
+            return selectedStyle.Render("  Metal Extractor (Not enough resources)")
         }
-        return "  " + text
+    }
+
+    getGas := func() string {
+        if m.Metal >= m.CostGas.MetalCost && m.Gas >= m.CostGas.GasCost {
+            selectedStyle := lipgloss.NewStyle().
+                Foreground(lipgloss.Color(utils.Color))
+
+            if m.MenuIndex == 1 {
+                return selectedStyle.Render("➜ Gas Extractor")
+            }
+            return "  Gas Extractor"
+        } else {
+            selectedStyle := lipgloss.NewStyle().
+                Foreground(lipgloss.Color("8"))
+
+            return selectedStyle.Render("  Gas Extractor (Not enough resources)")
+        }
     }
 
     cost := func(i BuildingCost) string {
@@ -100,7 +134,7 @@ func (m *BuildingsModel) View() string {
 
     return fmt.Sprintf(
         "[Buildings Upgrade Cost]\n\n%s\n%s\n%s\n%s",
-        cursor(0, "Metal Extractor"), cost(m.CostMetal), cursor(1, "Gas Extractor"), cost(m.CostGas),
+        getMetal(), cost(m.CostMetal), getGas(), cost(m.CostGas),
     )
 }
 

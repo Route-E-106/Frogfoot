@@ -26,15 +26,15 @@ const (
 
 type loginResultMsg struct {
     username string
-    jar *cookiejar.Jar
-    success bool
-    err     error
+    jar      *cookiejar.Jar
+    success  bool
+    err      error
 }
 
 type Login struct {
 	Form
     spinner spinner.Model
-    State LoginState
+    State   LoginState
     userMenuModel UserMenuModel 
 }
 
