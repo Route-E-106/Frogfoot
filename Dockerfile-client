@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY . ./
 
-RUN go build -o frogfoot-client./cmd/client/main.go
+RUN go build -o frogfoot-client ./cmd/client/main.go
 
 FROM golang:1.23.3-alpine
 
