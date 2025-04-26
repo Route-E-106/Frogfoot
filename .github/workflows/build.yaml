@@ -11,6 +11,9 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: ["server","client"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,12 +22,16 @@ jobs:
         with:
           go-version: '1.23.3'
       - name: Build server
-        run: go build -o tmp/frogfoot-server cmd/server/main.go
+        run: go build -o tmp/frogfoot-${{ matrix.type }} cmd/${{ matrix.type }}/main.go
+
   container:
     name: Container
     needs: build
     if: github.ref == 'refs/head/main'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: ["server","client"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +47,6 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          file: Dockerfile-${{ matrix.type }}
           push: true
-          tags: fulcrum29/frogfoot:latest
+          tags: fulcrum29/frogfoot-${{ matrix.type }}:latest
