@@ -41,7 +41,7 @@ type Login struct {
 func NewLogin() Login {
     s := spinner.New()
 	s.Spinner = spinner.Dot
-    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7AA2F6"))
 
 	return Login{
         Form: NewForm(),
@@ -133,29 +133,15 @@ func (m *Login) Update(msg tea.Msg) (*Login, tea.Cmd) {
 
 func (m Login) View() string {
 
-    var boxStyle = lipgloss.NewStyle().
-        Border(lipgloss.NormalBorder()).
-        BorderForeground(lipgloss.Color("63")).
-        Padding(5, 20)
-
-    var titleStyle = lipgloss.NewStyle().
-        Bold(true).
-        Foreground(lipgloss.Color("63")).
-        Padding(0, 1)
-
-    box := boxStyle.Render(
-        lipgloss.JoinVertical(lipgloss.Left, titleStyle.Render("Frogfoot")),
-    )
-
-	s := box + "\n\n" + "Login\n\n"
-
+	s := "[Login]\n\n"
 	s += "Username: " + m.Username.View() + "\n"
+
 	if m.UsernameErr != nil {
-		s += fmt.Sprintf("   [!] %s\n", m.UsernameErr.Error())
+		s += fmt.Sprintf("   [!] %s\n", m.RenderErr(m.UsernameErr))
 	}
 	s += "Password: " + m.Password.View() + "\n"
 	if m.PasswordErr != nil {
-		s += fmt.Sprintf("   [!] %s\n", m.PasswordErr.Error())
+		s += fmt.Sprintf("   [!] %s\n", m.RenderErr(m.PasswordErr))
 	}
 
 	switch m.State {

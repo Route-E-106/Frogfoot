@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type BuildingCost struct {
@@ -22,6 +23,8 @@ type BuildingsModel struct {
     CostMetal BuildingCost
     CostGas   BuildingCost
 }
+
+type requestResourcesMsg time.Time
 
 func NewBuildingsMenu(jar *cookiejar.Jar) BuildingsModel {
     costMetal, _ := getCost(jar, "metalExtractor")
@@ -62,19 +65,29 @@ func (m BuildingsModel) Update(msg tea.Msg) (BuildingsModel, tea.Cmd) {
 
             m.CostMetal = *costMetal
             m.CostGas = *costGas
+            return m, sendRequest()
 		}
 	}
 
     return m, nil
 }
 
+func sendRequest() tea.Cmd {
+	return func() tea.Msg {
+		return requestResourcesMsg(time.Now())
+	}
+}
+
 func (m *BuildingsModel) View() string {
 
-    cursor := func(i int) string {
+    cursor := func(i int, text string) string {
+        var selectedStyle = lipgloss.NewStyle().
+            Foreground(lipgloss.Color("#7AA2F6"))
+
         if m.MenuIndex == i {
-            return "➜ "
+            return selectedStyle.Render("➜ " + text)
         }
-        return "  "
+        return "  " + text
     }
 
     cost := func(i BuildingCost) string {
@@ -85,8 +98,8 @@ func (m *BuildingsModel) View() string {
     }
 
     return fmt.Sprintf(
-        "[Buildings Upgrade Cost]\n\n%sMetal Extractor\n%s\n%sGas Extractor\n%s",
-        cursor(0), cost(m.CostMetal), cursor(1), cost(m.CostGas),
+        "[Buildings Upgrade Cost]\n\n%s\n%s\n%s\n%s",
+        cursor(0, "Metal Extractor"), cost(m.CostMetal), cursor(1, "Gas Extractor"), cost(m.CostGas),
     )
 }
 

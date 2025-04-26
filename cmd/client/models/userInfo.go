@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"sort"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type UserMenuState int
@@ -44,7 +46,6 @@ type Resources struct {
 }
 
 type tickMsg time.Time
-type tickRequestMsg time.Time
 
 func NewUserMenu(username string, jar *cookiejar.Jar) UserMenuModel {
     model := UserMenuModel{
@@ -59,6 +60,7 @@ func NewUserMenu(username string, jar *cookiejar.Jar) UserMenuModel {
 
     return model
 }
+type tickRequestMsg time.Time
 
 func (m UserMenuModel) Tick() tea.Msg {
     return tickRequestMsg(time.Now())
@@ -66,6 +68,9 @@ func (m UserMenuModel) Tick() tea.Msg {
 
 func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
     switch msg.(type) {
+    case requestResourcesMsg:
+        m.updateResources()
+        return m, nil
     case tickRequestMsg:
         m.updateResources()
         return m, tea.Batch(m.tick(), m.tickRequest())
@@ -113,21 +118,30 @@ func (m *UserMenuModel) View() string {
     metal, metalIncome := m.resources.Metal.CalculateResources()
     gas, gasIncome := m.resources.Gas.CalculateResources()
 
-    s := fmt.Sprintf("\n[User] %s", m.username)
+    line := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#7AA2F6")).
+		Render(strings.Repeat("─", 50))
+
+    s := fmt.Sprintf("[User] %s", m.username)
     s += fmt.Sprintf("\n\n[Metal] %d|%d [Gas] %d|%d", metal, metalIncome, gas, gasIncome)
-    s += "\n---------------------------------------------\n"
-    cursor := func(i int) string {
+    s += "\n" + line + "\n"
+
+
+    cursor := func(i int, text string) string {
+        var selectedStyle = lipgloss.NewStyle().
+            Foreground(lipgloss.Color("#7AA2F6"))
+
         if m.MenuIndex == i {
-            return "➜ "
+            return selectedStyle.Render("➜ " + text)
         }
-        return "  "
+        return "  " + text
     }
 
     switch m.State {
     case UserMenu:
         return fmt.Sprintf(
-            "%s\n%sBuildings\n%sShips\n%sLogout\n\n(Use ↑/↓ and Enter)",
-            s, cursor(0), cursor(1), cursor(2),
+            "%s\n%s\n%s\n%s\n\n(Use ↑/↓ and Enter)",
+            s, cursor(0, "Buildings"), cursor(1, "Ships"), cursor(2, "Logout"),
         )
     case UserBuildings:
         return s + "\n" + m.BuildingsModel.View() + "\n\n(Use ↑/↓ and Enter)"
@@ -137,7 +151,7 @@ func (m *UserMenuModel) View() string {
 }
 
 func (m UserMenuModel) tickRequest() tea.Cmd {
-    return tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
+    return tea.Tick(time.Second*10, func(t time.Time) tea.Msg {
         return tickRequestMsg(t)
     })
 }
