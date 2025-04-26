@@ -35,11 +35,16 @@ func NewBuildingsMenu(jar *cookiejar.Jar, resources utils.Resources) BuildingsMo
 
     costGas, _ := getCost(jar, "gasExtractor")
 
+    metal, _ := resources.Metal.CalculateResources();
+    gas, _ := resources.Metal.CalculateResources();
+
     model := BuildingsModel{
         MenuIndex: 0,
         jar:       jar,
         CostMetal: *costMetal,
         CostGas:   *costGas,
+        Metal:     metal,
+        Gas:       gas,
     }
 
     return model
