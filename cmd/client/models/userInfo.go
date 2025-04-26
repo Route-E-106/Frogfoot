@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -119,17 +121,20 @@ func (m *UserMenuModel) View() string {
     gas, gasIncome := m.resources.Gas.CalculateResources()
 
     line := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#7AA2F6")).
+		Foreground(lipgloss.Color(utils.Color)).
 		Render(strings.Repeat("─", 50))
 
+    var incomeStyle = lipgloss.NewStyle().
+        Foreground(lipgloss.Color(utils.Color))
+
     s := fmt.Sprintf("[User] %s", m.username)
-    s += fmt.Sprintf("\n\n[Metal] %d|%d [Gas] %d|%d", metal, metalIncome, gas, gasIncome)
+    s += fmt.Sprintf("\n\n[Metal] %d/%s [Gas] %d/%s", metal, incomeStyle.Render(strconv.Itoa(metalIncome)), gas, incomeStyle.Render(strconv.Itoa(gasIncome)))
     s += "\n" + line + "\n"
 
 
     cursor := func(i int, text string) string {
         var selectedStyle = lipgloss.NewStyle().
-            Foreground(lipgloss.Color("#7AA2F6"))
+            Foreground(lipgloss.Color(utils.Color))
 
         if m.MenuIndex == i {
             return selectedStyle.Render("➜ " + text)
@@ -140,11 +145,11 @@ func (m *UserMenuModel) View() string {
     switch m.State {
     case UserMenu:
         return fmt.Sprintf(
-            "%s\n%s\n%s\n%s\n\n(Use ↑/↓ and Enter)",
+            "%s\n%s\n%s\n%s" + utils.Hints(),
             s, cursor(0, "Buildings"), cursor(1, "Ships"), cursor(2, "Logout"),
         )
     case UserBuildings:
-        return s + "\n" + m.BuildingsModel.View() + "\n\n(Use ↑/↓ and Enter)"
+        return s + "\n" + m.BuildingsModel.View() + utils.Hints()
     }
 
     return s

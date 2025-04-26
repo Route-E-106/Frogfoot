@@ -7,6 +7,7 @@ import (
 	"net/http/cookiejar"
 	"time"
 
+	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -82,7 +83,7 @@ func (m *BuildingsModel) View() string {
 
     cursor := func(i int, text string) string {
         var selectedStyle = lipgloss.NewStyle().
-            Foreground(lipgloss.Color("#7AA2F6"))
+            Foreground(lipgloss.Color(utils.Color))
 
         if m.MenuIndex == i {
             return selectedStyle.Render("➜ " + text)

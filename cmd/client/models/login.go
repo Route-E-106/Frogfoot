@@ -41,7 +41,7 @@ type Login struct {
 func NewLogin() Login {
     s := spinner.New()
 	s.Spinner = spinner.Dot
-    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7AA2F6"))
+    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(utils.Color))
 
 	return Login{
         Form: NewForm(),
@@ -146,7 +146,7 @@ func (m Login) View() string {
 
 	switch m.State {
     case StateInput:
-        s += "\n[Tab/↑↓/Enter] Switch  •  [Esc] Back"
+        s += utils.Hints()
 	case StateRequest:
         s += fmt.Sprintf("\nSending Credentials... %s", m.spinner.View())
 	case StateSucceeded:

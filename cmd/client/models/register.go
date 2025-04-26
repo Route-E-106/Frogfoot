@@ -39,7 +39,7 @@ type Register struct {
 func NewRegister() Register {
     s := spinner.New()
 	s.Spinner = spinner.Dot
-    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7AA2F6"))
+    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(utils.Color))
 
 	return Register{
         Form: NewForm(),
@@ -137,7 +137,7 @@ func (m Register) View() string {
 
 	switch m.State {
     case RegisterStateInput:
-        s += "\n[Tab/↑↓/Enter] Switch  •  [Esc] Back"
+        s += utils.Hints()
 	case RegisterStateRequest:
         s += fmt.Sprintf("\nSending Credentials... %s", m.spinner.View())
 	case RegisterStateSucceeded:

@@ -93,24 +93,24 @@ func (m AppModel) View() string {
     
     var boxStyle = lipgloss.NewStyle().
         Border(lipgloss.NormalBorder()).
-        BorderForeground(lipgloss.Color("#7AA2F6")).
+        BorderForeground(lipgloss.Color(utils.Color)).
         Padding(2, 5)
 
     var titleStyle = lipgloss.NewStyle().
         Bold(true).
-        Foreground(lipgloss.Color("#7AA2F6")).
+        Foreground(lipgloss.Color(utils.Color)).
         Padding(0, 1)
 
     box := "\n" + 
     boxStyle.Render(
-        lipgloss.JoinVertical(lipgloss.Left, titleStyle.Render("Frogfoot")),
+        lipgloss.JoinVertical(lipgloss.Left, titleStyle.Render("FROGFOOT")),
     ) + "\n\n"
 
 	switch m.State {
 	case StateMenu:
 		cursor := func(i int, text string) string {
             var selectedStyle = lipgloss.NewStyle().
-                Foreground(lipgloss.Color("#7AA2F6"))
+                Foreground(lipgloss.Color(utils.Color))
 
 			if m.MenuIndex == i {
 				return selectedStyle.Render("➜ " + text)
@@ -118,7 +118,7 @@ func (m AppModel) View() string {
 			return "  " + text
 		}
 		return box + fmt.Sprintf(
-			"%s\n%s\n\n(Use ↑/↓ and Enter)",
+			"%s\n%s" + utils.Hints(),
 			cursor(0, "Login"), cursor(1, "Register"),
 		)
 	case StateLogin:
