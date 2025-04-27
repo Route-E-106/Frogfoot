@@ -24,8 +24,6 @@ type BuildingsModel struct {
     CostMetal BuildingCost
     CostGas   BuildingCost
     resources utils.Resources
-    Metal     int64
-    Gas       int64
 }
 
 type requestResourcesMsg time.Time
@@ -35,16 +33,12 @@ func NewBuildingsMenu(jar *cookiejar.Jar, resources utils.Resources) BuildingsMo
 
     costGas, _ := getCost(jar, "gasExtractor")
 
-    metal, _ := resources.Metal.CalculateResources();
-    gas, _ := resources.Metal.CalculateResources();
-
     model := BuildingsModel{
         MenuIndex: 0,
         jar:       jar,
         CostMetal: *costMetal,
         CostGas:   *costGas,
-        Metal:     metal,
-        Gas:       gas,
+        resources: resources,
     }
 
     return model
@@ -52,21 +46,22 @@ func NewBuildingsMenu(jar *cookiejar.Jar, resources utils.Resources) BuildingsMo
 
 func (m BuildingsModel) Update(msg tea.Msg) (BuildingsModel, tea.Cmd) {
     metal, _ := m.resources.Metal.CalculateResources();
-    gas, _ := m.resources.Metal.CalculateResources();
-
-    m.Metal = metal
-    m.Gas = gas
+    gas, _ := m.resources.Gas.CalculateResources();
 
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "up":
 			if m.MenuIndex == 1 && metal >= m.CostMetal.MetalCost && gas >= m.CostMetal.GasCost {
 				m.MenuIndex--
-			}
+			} else {
+                m.MenuIndex = 0
+            }
 		case "down":
 			if m.MenuIndex == 0 && metal >= m.CostGas.MetalCost && gas >= m.CostGas.GasCost {
 				m.MenuIndex++
-			}
+			} else {
+                m.MenuIndex = 1
+            }
 		case "enter":
             if m.MenuIndex == 0 && metal >= m.CostMetal.MetalCost && gas >= m.CostMetal.GasCost {
                 upgradeBuilding(m.jar, "metalExtractor")
@@ -96,8 +91,11 @@ func sendRequest() tea.Cmd {
 
 func (m *BuildingsModel) View() string {
 
+    metal, _ := m.resources.Metal.CalculateResources();
+    gas, _   := m.resources.Gas.CalculateResources();
+
     getMetal := func() string {
-        if m.Metal >= m.CostMetal.MetalCost && m.Gas >= m.CostMetal.GasCost {
+        if metal >= m.CostMetal.MetalCost && gas >= m.CostMetal.GasCost {
             selectedStyle := lipgloss.NewStyle().
                 Foreground(lipgloss.Color(utils.Color))
 
@@ -114,7 +112,7 @@ func (m *BuildingsModel) View() string {
     }
 
     getGas := func() string {
-        if m.Metal >= m.CostGas.MetalCost && m.Gas >= m.CostGas.GasCost {
+        if metal >= m.CostGas.MetalCost && gas >= m.CostGas.GasCost {
             selectedStyle := lipgloss.NewStyle().
                 Foreground(lipgloss.Color(utils.Color))
 
