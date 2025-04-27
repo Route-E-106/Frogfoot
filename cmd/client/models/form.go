@@ -2,6 +2,7 @@ package model
 
 import (
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type Form struct {
@@ -31,6 +32,12 @@ func NewForm() Form {
 		Password: p,
 		MenuIndex:    0,
 	}
+}
+
+func (f *Form) RenderErr(error error) (string) {
+    style := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+
+	return style.Render(error.Error())
 }
 
 func (f *Form) SwitchFocus() {

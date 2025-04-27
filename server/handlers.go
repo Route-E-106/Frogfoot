@@ -179,6 +179,62 @@ func (s *Server) handlerGetCurrentResources() http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+func (s *Server) handlerGetMetalExtractorNextLevelCost() http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+
+		userId := s.sessionManager.GetInt64(r.Context(), "userAuthID")
+		lvl, err := s.Queries.GetUserMetalExtractorLevel(r.Context(), userId)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			return
+		}
+
+		cost := buildings.MetalBuildingCostPerLevel[lvl+1]
+		data, err := json.Marshal(cost)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			return
+		}
+
+		s.Logger.Info("Next level Metal extractor cost", "cost", data)
+
+		_, err = w.Write(data)
+		if err != nil {
+			s.Logger.Error(err.Error())
+		}
+
+	}
+	return http.HandlerFunc(fn)
+}
+
+func (s *Server) handlerGetGasExtractorNextLevelCost() http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+
+		userId := s.sessionManager.GetInt64(r.Context(), "userAuthID")
+		lvl, err := s.Queries.GetUserGasExtractorLevel(r.Context(), userId)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			return
+		}
+
+		cost := buildings.GasBuildingCostPerLevel[lvl+1]
+		data, err := json.Marshal(cost)
+		if err != nil {
+			s.Logger.Error(err.Error())
+			return
+		}
+
+		s.Logger.Info("Next level Gas extractor cost", "cost", data)
+
+		_, err = w.Write(data)
+		if err != nil {
+			s.Logger.Error(err.Error())
+		}
+
+	}
+	return http.HandlerFunc(fn)
+}
+
 func (s *Server) handlerUpgradeMetalExtractor() http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 

@@ -3,13 +3,15 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"net/http/cookiejar"
-	"sort"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type UserMenuState int
@@ -23,27 +25,12 @@ type UserMenuModel struct {
 	State     UserMenuState
 	MenuIndex int
     username  string
-    resources Resources
-    jar *cookiejar.Jar
-}
-
-type IncomeCommand struct {
-	Income int
-	Timestamp time.Time
-}
-
-type ResourceHistory struct {
-    ChangeAmount int
-	Incomes []IncomeCommand
-}
-
-type Resources struct {
-    Metal ResourceHistory
-    Gas ResourceHistory
+    resources utils.Resources
+    jar       *cookiejar.Jar
+    BuildingsModel BuildingsModel
 }
 
 type tickMsg time.Time
-type tickRequestMsg time.Time
 
 func NewUserMenu(username string, jar *cookiejar.Jar) UserMenuModel {
     model := UserMenuModel{
@@ -57,6 +44,7 @@ func NewUserMenu(username string, jar *cookiejar.Jar) UserMenuModel {
 
     return model
 }
+type tickRequestMsg time.Time
 
 func (m UserMenuModel) Tick() tea.Msg {
     return tickRequestMsg(time.Now())
@@ -64,12 +52,32 @@ func (m UserMenuModel) Tick() tea.Msg {
 
 func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
     switch msg.(type) {
+    case requestResourcesMsg:
+        m.updateResources()
+        return m, nil
     case tickRequestMsg:
         m.updateResources()
         return m, tea.Batch(m.tick(), m.tickRequest())
     case tickMsg:
         return m, m.tick()
     }
+    switch m.State {
+
+    case UserBuildings:
+        switch msg := msg.(type) {
+            case tea.KeyMsg:
+                switch msg.String() {
+                case "esc":
+                    m.State = UserMenu
+                    return m, nil
+            }
+        }
+
+		buildingsModel, cmd := m.BuildingsModel.Update(msg)
+		m.BuildingsModel = buildingsModel
+		return m, cmd
+    }
+
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "up":
@@ -81,6 +89,9 @@ func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
 				m.MenuIndex++
 			}
 		case "enter":
+            if m.MenuIndex == 0 {
+                m.State = UserBuildings
+            }
 		}
 	}
 
@@ -88,24 +99,46 @@ func (m UserMenuModel) Update(msg tea.Msg) (UserMenuModel, tea.Cmd) {
 }
 
 func (m *UserMenuModel) View() string {
-    metal := m.resources.Metal.CalculateResources()
-    gas := m.resources.Gas.CalculateResources()
+    metal, metalIncome := m.resources.Metal.CalculateResources()
+    gas, gasIncome := m.resources.Gas.CalculateResources()
+
+    line := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(utils.Color)).
+		Render(strings.Repeat("─", 50))
+
+    var incomeStyle = lipgloss.NewStyle().
+        Foreground(lipgloss.Color(utils.Color))
 
     s := fmt.Sprintf("[User] %s", m.username)
-    s += fmt.Sprintf("\n\n[Metal] %d [Gas] %d", metal, gas)
-    cursor := func(i int) string {
+    s += fmt.Sprintf("\n\n[Metal] %d/%s [Gas] %d/%s", metal, incomeStyle.Render(strconv.Itoa(metalIncome)), gas, incomeStyle.Render(strconv.Itoa(gasIncome)))
+    s += "\n" + line + "\n"
+
+
+    cursor := func(i int, text string) string {
+        var selectedStyle = lipgloss.NewStyle().
+            Foreground(lipgloss.Color(utils.Color))
+
         if m.MenuIndex == i {
-            return "➜ "
+            return selectedStyle.Render("➜ " + text)
         }
-        return "  "
+        return "  " + text
     }
-    return fmt.Sprintf(
-        "\n%s\n\n%sBuildings\n%sShips\n%sLogout\n\n(Use ↑/↓ and Enter)",
-        s, cursor(0), cursor(1), cursor(2),
-    )
+
+    switch m.State {
+    case UserMenu:
+        return fmt.Sprintf(
+            "%s\n%s\n%s\n%s" + utils.Hints(),
+            s, cursor(0, "Buildings"), cursor(1, "Ships"), cursor(2, "Logout"),
+        )
+    case UserBuildings:
+        return s + "\n" + m.BuildingsModel.View() + utils.Hints()
+    }
+
+    return s
 }
+
 func (m UserMenuModel) tickRequest() tea.Cmd {
-    return tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
+    return tea.Tick(time.Second*10, func(t time.Time) tea.Msg {
         return tickRequestMsg(t)
     })
 }
@@ -123,73 +156,41 @@ func (m *UserMenuModel) updateResources() {
     }
 
     m.resources = *resources 
+    m.BuildingsModel = NewBuildingsMenu(m.jar, *resources)
+
     return
 }
-func (history ResourceHistory) CalculateResources() int {
 
-    currentTime := time.Now()
-    commands := history.Incomes
-	if len(commands) == 0 {
-		return history.ChangeAmount
-	}
-
-	sort.Slice(commands, func(i, j int) bool {
-		return commands[i].Timestamp.Before(commands[j].Timestamp)
-	})
-
-	total := 0.0
-
-	for i := range commands {
-		start := commands[i].Timestamp
-
-		if currentTime.Before(start) {
-			break
-		}
-
-		var end time.Time
-		if i+1 < len(commands) {
-			end = commands[i+1].Timestamp
-		} else {
-			end = currentTime
-		}
-
-		if end.After(currentTime) {
-			end = currentTime
-		}
-
-		duration := end.Sub(start).Hours()
-		if duration > 0 {
-			total += duration * float64(commands[i].Income)
-		}
-	}
-
-    return int(math.Floor(total)) + history.ChangeAmount
-}
-
-func getResources(jar *cookiejar.Jar) (*Resources, error) {
+func getResources(jar *cookiejar.Jar) (*utils.Resources, error) {
 
     type rawIncome struct {
         Income          int   `json:"income"`
         ChangeTimestamp int64 `json:"change_timestamp"`
     }
 
-    type rawResources struct {
-        Gas   []rawIncome `json:"gas"`
-        Metal []rawIncome `json:"metal"`
+    type rawExpenses struct {
+        TotalGasExpenses   int64 `json:"total_gas_expenses"`
+        TotalMetalExpenses int64 `json:"total_metal_expenses"`
     }
 
-    mapToResourceHistory := func (rawIncomes []rawIncome) ResourceHistory {
-        var incomes []IncomeCommand
+    type rawResources struct {
+        Gas   []rawIncome         `json:"gas"`
+        Metal []rawIncome         `json:"metal"`
+        TotalExpenses rawExpenses `json:"expenses"`
+    }
+
+    mapToResourceHistory := func (rawIncomes []rawIncome, totalExpenses int64) utils.ResourceHistory {
+        var incomes []utils.IncomeCommand
         for _, ri := range rawIncomes {
-            incomes = append(incomes, IncomeCommand{
+            incomes = append(incomes, utils.IncomeCommand{
                 Income:    ri.Income,
                 Timestamp: time.Unix(ri.ChangeTimestamp, 0),
             })
         }
-        return ResourceHistory{Incomes: incomes}
+        return utils.ResourceHistory{Incomes: incomes, TotalExpenses: totalExpenses}
     }
 
-    url := "http://localhost:8080/resources"
+    url := "http://localhost:8080/resources/history"
 
     client := &http.Client{Timeout: 10 * time.Second, Jar: jar}
 
@@ -208,9 +209,9 @@ func getResources(jar *cookiejar.Jar) (*Resources, error) {
 	}
 
 	if resp.StatusCode == 200 {
-        resources := &Resources{
-            Gas:   mapToResourceHistory(raw.Gas),
-            Metal: mapToResourceHistory(raw.Metal),
+        resources := &utils.Resources{
+            Gas:   mapToResourceHistory(raw.Gas, raw.TotalExpenses.TotalGasExpenses),
+            Metal: mapToResourceHistory(raw.Metal, raw.TotalExpenses.TotalMetalExpenses),
         }
 
         return resources, nil
@@ -218,4 +219,3 @@ func getResources(jar *cookiejar.Jar) (*Resources, error) {
 
 	return nil, fmt.Errorf("unexpected error: %s", resp.Status)
 }
-

@@ -9,6 +9,7 @@ import (
 	"time"
 	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
     "github.com/charmbracelet/bubbles/spinner"
+    "github.com/charmbracelet/lipgloss"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -25,21 +26,22 @@ const (
 
 type loginResultMsg struct {
     username string
-    jar *cookiejar.Jar
-    success bool
-    err     error
+    jar      *cookiejar.Jar
+    success  bool
+    err      error
 }
 
 type Login struct {
 	Form
     spinner spinner.Model
-    State LoginState
+    State   LoginState
     userMenuModel UserMenuModel 
 }
 
 func NewLogin() Login {
     s := spinner.New()
 	s.Spinner = spinner.Dot
+    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(utils.Color))
 
 	return Login{
         Form: NewForm(),
@@ -130,19 +132,21 @@ func (m *Login) Update(msg tea.Msg) (*Login, tea.Cmd) {
 }
 
 func (m Login) View() string {
-	s := "Login\n\n"
+
+	s := "[Login]\n\n"
 	s += "Username: " + m.Username.View() + "\n"
+
 	if m.UsernameErr != nil {
-		s += fmt.Sprintf("   [!] %s\n", m.UsernameErr.Error())
+		s += fmt.Sprintf("   [!] %s\n", m.RenderErr(m.UsernameErr))
 	}
 	s += "Password: " + m.Password.View() + "\n"
 	if m.PasswordErr != nil {
-		s += fmt.Sprintf("   [!] %s\n", m.PasswordErr.Error())
+		s += fmt.Sprintf("   [!] %s\n", m.RenderErr(m.PasswordErr))
 	}
 
 	switch m.State {
     case StateInput:
-        s += "\n[Tab/↑↓/Enter] Switch  •  [Esc] Back"
+        s += utils.Hints()
 	case StateRequest:
         s += fmt.Sprintf("\nSending Credentials... %s", m.spinner.View())
 	case StateSucceeded:
@@ -161,6 +165,7 @@ func attemptLogin(m *Login) tea.Cmd {
     password := m.Password.Value()
 
     return func() tea.Msg {
+        time.Sleep(2 * time.Second)
         jar, err := login(username, password)
         if err != nil {
             return loginResultMsg{success: false, err: err}

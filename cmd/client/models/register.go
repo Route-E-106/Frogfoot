@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
 	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/lipgloss"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -37,6 +39,7 @@ type Register struct {
 func NewRegister() Register {
     s := spinner.New()
 	s.Spinner = spinner.Dot
+    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(utils.Color))
 
 	return Register{
         Form: NewForm(),
@@ -122,19 +125,19 @@ func (m Register) Update(msg tea.Msg) (Register, tea.Cmd) {
 }
 
 func (m Register) View() string {
-	s := "Register\n\n"
+	s := "[Register]\n\n"
 	s += "Username: " + m.Username.View() + "\n"
 	if m.UsernameErr != nil {
-		s += fmt.Sprintf("   [!] %s\n", m.UsernameErr.Error())
+		s += fmt.Sprintf("   [!] %s\n", m.RenderErr(m.UsernameErr))
 	}
 	s += "Password: " + m.Password.View() + "\n"
 	if m.PasswordErr != nil {
-		s += fmt.Sprintf("   [!] %s\n", m.PasswordErr.Error())
+		s += fmt.Sprintf("   [!] %s\n", m.RenderErr(m.PasswordErr))
 	}
 
 	switch m.State {
     case RegisterStateInput:
-        s += "\n[Tab/↑↓/Enter] Switch  •  [Esc] Back"
+        s += utils.Hints()
 	case RegisterStateRequest:
         s += fmt.Sprintf("\nSending Credentials... %s", m.spinner.View())
 	case RegisterStateSucceeded:
@@ -151,6 +154,7 @@ func attemptRegister(m Register) tea.Cmd {
     password := m.Password.Value()
 
     return func() tea.Msg {
+        time.Sleep(2 * time.Second)
         err := register(username, password)
         if err != nil {
             return registerResultMsg{success: false, err: err}

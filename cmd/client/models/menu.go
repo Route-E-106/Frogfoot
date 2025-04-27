@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"github.com/Route-E-106/Frogfoot/cmd/client/utils"
+    "github.com/charmbracelet/lipgloss"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -89,22 +90,41 @@ func (m AppModel) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) View() string {
+    
+    var boxStyle = lipgloss.NewStyle().
+        Border(lipgloss.NormalBorder()).
+        BorderForeground(lipgloss.Color(utils.Color)).
+        Padding(2, 5)
+
+    var titleStyle = lipgloss.NewStyle().
+        Bold(true).
+        Foreground(lipgloss.Color(utils.Color)).
+        Padding(0, 1)
+
+    box := "\n" + 
+    boxStyle.Render(
+        lipgloss.JoinVertical(lipgloss.Left, titleStyle.Render("FROGFOOT")),
+    ) + "\n\n"
+
 	switch m.State {
 	case StateMenu:
-		cursor := func(i int) string {
+		cursor := func(i int, text string) string {
+            var selectedStyle = lipgloss.NewStyle().
+                Foreground(lipgloss.Color(utils.Color))
+
 			if m.MenuIndex == i {
-				return "➜ "
+				return selectedStyle.Render("➜ " + text)
 			}
-			return "  "
+			return "  " + text
 		}
-		return fmt.Sprintf(
-			"\nWelcome! Choose an option:\n\n%sLogin\n%sRegister\n\n(Use ↑/↓ and Enter)",
-			cursor(0), cursor(1),
+		return box + fmt.Sprintf(
+			"%s\n%s" + utils.Hints(),
+			cursor(0, "Login"), cursor(1, "Register"),
 		)
 	case StateLogin:
-		return m.Login.View()
+		return box + m.Login.View()
 	case StateRegister:
-		return m.Register.View()
+		return box + m.Register.View()
 	}
 	return ""
 }
